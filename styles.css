@@ -1,0 +1,700 @@
+/* nomi — Claude Code in Ghostty. JetBrains Mono, one orange accent, glyphs as structure.
+   See .agents/skills/nomi-design/SKILL.md before editing. */
+
+:root{
+  /* Sampled from the user's Ghostty + Claude Code window. */
+  --bg:#292c33;
+  --bg-2:#373737;
+  --ink:#ffffff;
+  --muted:#999999;
+  --rule:#888888;
+  --line:rgba(255,255,255,.10);
+  --track:rgba(255,255,255,.14);
+  --accent:#f19e4b;
+  --accent-2:#f4ba73;
+  --danger:#ff6b80; /* Claude Code error red */
+  --code:#a4cbfa; /* paths / inline code in the terminal; used for photo filenames */
+  --mode:#f7ce46;
+  --scrim:rgba(0,0,0,.6);
+  /* Crop overlay (unchanged). */
+  --white:#ffffff;
+  --crop-dim:rgba(0,0,0,.55);
+  --crop-edge:rgba(255,255,255,.9);
+  --crop-grid:rgba(255,255,255,.35);
+
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --bar:52px;
+  --target:44px;
+  --font:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  min-height:100dvh;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(--font);
+  font-size:14px;
+  font-weight:400;
+  line-height:1.4;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,p{margin:0}
+button,input{font:inherit;color:inherit}
+input,textarea{caret-color:var(--ink);caret-shape:block}
+
+.hidden{display:none !important}
+:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+/* ---------- Glyphs ---------- */
+.chev{color:var(--muted)}
+.cursor{
+  display:inline-block;width:8px;height:16px;
+  vertical-align:text-bottom;
+  background:var(--ink);
+  animation:blink 1s steps(1) infinite;
+}
+@keyframes blink{50%{opacity:0}}
+
+/* ---------- Buttons: terminal text, not boxes ---------- */
+.btn,.tab,.chip{
+  min-height:var(--target);
+  cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0 var(--s3);
+  border:0;border-radius:0;
+  background:transparent;
+  color:var(--muted);
+  font-size:14px;
+  white-space:nowrap;
+}
+.btn:hover{background:var(--bg-2);color:var(--ink)}
+.btn.primary{color:var(--accent)}
+.btn.primary::before{content:"[ ";white-space:pre}
+.btn.primary::after{content:" ]";white-space:pre}
+.btn.primary:hover{background:var(--bg-2);color:var(--accent-2)}
+.btn:active{opacity:.85}
+
+/* Import: the real file input covers the whole button. */
+.file-btn{position:relative;overflow:hidden}
+.file-btn input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+
+/* ---------- Global top bar ---------- */
+.topbar{
+  position:sticky;top:0;z-index:5;
+  display:flex;align-items:center;gap:var(--s4);
+  height:var(--bar);
+  padding:0 var(--s5);
+  background:var(--bg);
+  border-bottom:1px solid var(--rule);
+}
+body:has(#viewEditor:not(.hidden)) .topbar{display:none}
+.brand{display:flex;align-items:center;gap:var(--s2);font-size:14px;font-weight:500;color:var(--ink);white-space:nowrap}
+.brand-mark{width:18px;height:18px;flex:none}
+.logo-cursor{animation:blink 1s steps(1) infinite}
+.crumb{
+  flex:1;min-width:0;
+  color:var(--muted);font-size:12px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.topbar .btn{margin-left:auto}
+
+/* ---------- Views ---------- */
+.view{max-width:1200px;margin:0 auto;padding:var(--s5)}
+
+.page-head{
+  display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+  gap:var(--s4);
+  padding-bottom:var(--s5);
+}
+.page-titles{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:var(--s1)}
+.title{font-size:22px;font-weight:700;line-height:1.4}
+.title::before{content:"● ";white-space:pre;color:var(--ink)}
+/* Secondary/meta lines hang off the heading with ⎿ (text is set by JS). */
+.sub{color:var(--muted);font-size:12px;padding-left:var(--s5)}
+.sub::before{content:"⎿ ";white-space:pre;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+
+/* Albums */
+.album-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:var(--s5) var(--s4);
+  align-items:start;
+}
+.album-card{
+  display:flex;flex-direction:column;gap:var(--s1);
+  cursor:pointer;
+  min-height:var(--target);
+}
+.album-card .thumbs{
+  display:flex;gap:2px;align-items:flex-start;
+  margin-bottom:var(--s2);
+  min-height:var(--target);
+  background:var(--bg-2);
+}
+.album-card .thumbs img{
+  flex:1 1 0;min-width:0;
+  display:block;height:auto;
+  object-fit:contain;
+  border-radius:2px;
+}
+.album-card h3{
+  font-size:14px;font-weight:400;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.album-card h3::before{content:"● ";white-space:pre;color:var(--ink)}
+.album-card:hover h3{color:var(--accent)}
+.album-card .meta{color:var(--muted);font-size:11px}
+
+/* Empty state: a Claude Code transcript. */
+.empty{padding:var(--s6) 0;display:flex;flex-direction:column;gap:var(--s1);font-size:14px}
+.t-line{color:var(--ink)}
+.t-sub{color:var(--muted);padding-left:2ch}
+.t-prompt{color:var(--ink);margin-top:var(--s3)}
+/* Memory notice on the albums page: Claude Code's yellow warning bullet + ⎿ detail lines. */
+.notice{
+  display:flex;flex-direction:column;gap:var(--s1);
+  margin:0 0 var(--s5);padding:var(--s3) 0;
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  font-size:12px;line-height:1.5;max-width:88ch;
+}
+.notice .t-line{font-size:13px}
+.notice .warn{color:var(--mode)}
+.notice .t-sub{padding-left:2ch;text-indent:-2ch;margin-left:2ch}
+
+/* Album detail: the name is a Claude Code prompt line. */
+.prompt-line{
+  display:flex;align-items:center;gap:var(--s3);
+  min-height:var(--target);
+  border-top:1px solid transparent;border-bottom:1px solid transparent;
+  font-size:22px;
+}
+.prompt-line:focus-within{border-top-color:var(--rule);border-bottom-color:var(--rule)}
+.prompt-line:focus-within .chev{color:var(--ink)}
+.album-name{
+  flex:1;width:100%;min-width:0;
+  font-size:22px;font-weight:700;line-height:1.4;color:var(--ink);
+  padding:0 var(--s1);
+  border:0;border-radius:0;
+  background:transparent;
+  outline:none;
+  caret-color:var(--ink);caret-shape:block;
+}
+.album-name:focus,.album-name:focus-visible{background:var(--bg-2);outline:none}
+
+.drop{
+  display:block;
+  min-height:var(--target);
+  margin-bottom:var(--s5);
+  padding:var(--s3) 0;
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  color:var(--muted);font-size:14px;
+  cursor:pointer;
+}
+.drop:hover{color:var(--ink)}
+.drop .cursor{margin-left:var(--s2)}
+
+.photo-grid{display:flex;flex-direction:column;gap:2px;min-width:0}
+.photo-row{display:flex;gap:2px;overflow:hidden}
+.photo-card{position:relative;flex:none;overflow:hidden;cursor:pointer;background:var(--bg-2);border-radius:2px}
+.photo-card img{display:block;width:100%;height:100%;object-fit:cover}
+/* Name + card actions appear on hover/focus; actions always visible on touch screens. */
+.photo-card .nm,.photo-card .card-actions{position:absolute;opacity:0;transition:opacity .12s}
+.photo-card .nm{
+  left:0;right:0;bottom:0;
+  padding:var(--s4) var(--s2) var(--s2);
+  background:linear-gradient(transparent,var(--scrim));
+  color:var(--code);font-size:11px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  pointer-events:none;
+}
+.photo-card .card-actions{top:var(--s2);right:var(--s2);display:flex;gap:2px}
+.card-actions button{
+  min-width:32px;min-height:32px;padding:0 var(--s2);
+  border:0;border-radius:0;
+  background:var(--bg-2);color:var(--ink);
+  font:inherit;font-size:13px;cursor:pointer;
+}
+.card-actions .dup:hover{color:var(--accent)}
+.card-actions .del:hover{color:var(--danger)}
+.photo-card:hover .nm,.photo-card:hover .card-actions,.photo-card:focus-within .card-actions{opacity:1}
+@media (hover:none){.photo-card .card-actions{opacity:1}}
+.photo-card.edited::after{
+  content:'';
+  position:absolute;top:var(--s2);left:var(--s2);
+  width:8px;height:8px;border-radius:50%;
+  background:var(--accent);
+}
+
+/* ---------- Editor ---------- */
+.view.editor{
+  max-width:none;margin:0;padding:0;
+  height:100dvh;
+  display:grid;
+  grid-template-columns:1fr clamp(280px,28vw,360px);
+  grid-template-rows:var(--bar) minmax(0,1fr);
+  overflow:hidden;
+}
+.ed-top{
+  grid-column:1 / -1;
+  display:flex;align-items:center;gap:var(--s3);
+  height:var(--bar);
+  padding:0 var(--s5);
+  border-bottom:1px solid var(--rule);
+  background:var(--bg);
+}
+.ed-name{
+  flex:1;min-width:0;
+  color:var(--code);font-size:12px;text-align:center;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.ed-actions{flex-wrap:nowrap}
+
+.stage{position:relative;min-width:0;min-height:0;background:var(--bg)}
+.stage::after{
+  content:'';
+  position:absolute;top:0;bottom:0;right:0;
+  width:140px;
+  /* Eased ramp (smoothstep-like) so there is no visible band where the fade meets the rail. */
+  --fe:var(--edge-soft,var(--bg));
+  background:linear-gradient(90deg,
+    transparent,
+    color-mix(in srgb,var(--fe) 6%,transparent) 20%,
+    color-mix(in srgb,var(--fe) 22%,transparent) 40%,
+    color-mix(in srgb,var(--fe) 50%,transparent) 60%,
+    color-mix(in srgb,var(--fe) 80%,transparent) 80%,
+    color-mix(in srgb,var(--fe) 95%,transparent) 92%,
+    var(--fe));
+  pointer-events:none;
+  z-index:1;
+}
+.stage-wrap{
+  position:relative;
+  width:100%;height:100%;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;
+  padding:var(--s5);
+  background:var(--bg);
+}
+#glCanvas{display:block;max-width:100%;max-height:100%;flex:none}
+
+.crop-layer{position:absolute;z-index:2}
+.crop-box{
+  position:absolute;
+  box-shadow:0 0 0 9999px var(--crop-dim);
+  outline:calc(1px * var(--inv,1)) solid var(--crop-edge);
+  transition:box-shadow .25s ease;
+  cursor:move;
+  touch-action:none;
+}
+.crop-grid{
+  --gw:calc(.5px * var(--inv,1));
+  position:absolute;inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(to right,transparent calc(33.333% - var(--gw)),var(--crop-grid) calc(33.333% - var(--gw)),var(--crop-grid) calc(33.333% + var(--gw)),transparent calc(33.333% + var(--gw)),transparent calc(66.666% - var(--gw)),var(--crop-grid) calc(66.666% - var(--gw)),var(--crop-grid) calc(66.666% + var(--gw)),transparent calc(66.666% + var(--gw))),
+    linear-gradient(to bottom,transparent calc(33.333% - var(--gw)),var(--crop-grid) calc(33.333% - var(--gw)),var(--crop-grid) calc(33.333% + var(--gw)),transparent calc(33.333% + var(--gw)),transparent calc(66.666% - var(--gw)),var(--crop-grid) calc(66.666% - var(--gw)),var(--crop-grid) calc(66.666% + var(--gw)),transparent calc(66.666% + var(--gw)));
+}
+.crop-box .h{
+  position:absolute;
+  width:44px;height:44px;
+  touch-action:none;
+  z-index:1;
+  /* Keep brackets and hit areas screen-sized while the crop view is zoomed. */
+  transform:scale(var(--inv,1));
+}
+.crop-box .h::before{
+  content:'';
+  position:absolute;
+  width:22px;height:22px;
+  border:0 solid var(--white);
+}
+.h.tl{top:-22px;left:-22px;cursor:nwse-resize}
+.h.tr{top:-22px;right:-22px;cursor:nesw-resize}
+.h.bl{bottom:-22px;left:-22px;cursor:nesw-resize}
+.h.br{bottom:-22px;right:-22px;cursor:nwse-resize}
+/* Bracket's outer edge sits 3px outside the crop corner (hit-area centre = corner). */
+.h.tl::before{top:19px;left:19px;border-top-width:3px;border-left-width:3px}
+.h.tr::before{top:19px;right:19px;border-top-width:3px;border-right-width:3px}
+.h.bl::before{bottom:19px;left:19px;border-bottom-width:3px;border-left-width:3px}
+.h.br::before{bottom:19px;right:19px;border-bottom-width:3px;border-right-width:3px}
+
+.rail{
+  min-width:0;min-height:0;
+  display:flex;flex-direction:column;gap:var(--s5);
+  padding:var(--s5);
+  overflow-y:auto;
+  background:var(--edge-soft,var(--bg));
+}
+
+/* Tabs: a Claude Code menu. The chosen row gets ❯ (mode yellow) and white text. */
+.tabs{display:flex;flex-wrap:wrap;column-gap:var(--s4)}
+.tab{
+  padding:0;
+  border:0;border-radius:0;
+  background:transparent;
+  color:var(--muted);
+  font-size:14px;
+}
+.tab::before{content:"❯ ";white-space:pre;color:transparent}
+.tab:hover{color:var(--ink)}
+.tab.active{color:var(--ink)}
+.tab.active::before{color:var(--mode)}
+
+.adjust-list{display:flex;flex-direction:column;gap:var(--s4)}
+.crop-panel{display:flex;flex-direction:column;gap:var(--s5)}
+.group{display:flex;flex-direction:column;gap:var(--s3)}
+.group-title{color:var(--ink);font-size:12px}
+.group-title::before{content:"● ";white-space:pre;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:var(--s1)}
+.chip{
+  padding:0 var(--s2);
+  border:0;border-radius:0;
+  background:transparent;color:var(--muted);
+  font-size:12px;
+}
+.chip::before{content:"❯ ";white-space:pre;color:transparent}
+.chip:hover{background:var(--bg-2);color:var(--ink)}
+.chip.active{background:var(--bg-2);color:var(--ink)}
+.chip.active::before{color:var(--accent)}
+.hint{color:var(--muted);font-size:11px}
+
+/* Sliders: 2px track, accent fill, block-cursor thumb. */
+.slider{
+  display:flex;flex-direction:column;justify-content:center;
+  min-height:var(--target);
+  font-size:12px;
+}
+.slider span{
+  display:flex;justify-content:space-between;align-items:baseline;gap:var(--s2);
+  font-variant-numeric:tabular-nums;
+}
+.slider span i{
+  font-style:normal;color:var(--muted);
+  min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.slider span b{font-weight:400;color:var(--ink);text-align:right}
+.slider.changed b{color:var(--accent)}
+.slider.changed i{color:var(--ink)}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  display:block;width:100%;
+  height:24px;margin:0;padding:0;
+  background:transparent;
+  cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:2px;border:0;
+  /* Optional fill: JS may set --lo/--hi (percent) to paint the changed span in accent. */
+  background:linear-gradient(to right,var(--track) var(--lo,50%),var(--accent) var(--lo,50%),var(--accent) var(--hi,50%),var(--track) var(--hi,50%));
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:8px;height:16px;margin-top:-7px;
+  border:0;border-radius:0;
+  background:var(--ink);
+}
+input[type=range]:hover::-webkit-slider-thumb,
+input[type=range]:active::-webkit-slider-thumb{background:var(--accent)}
+input[type=range]::-moz-range-track{
+  height:2px;border:0;
+  background:linear-gradient(to right,var(--track) var(--lo,50%),var(--accent) var(--lo,50%),var(--accent) var(--hi,50%),var(--track) var(--hi,50%));
+}
+input[type=range]::-moz-range-thumb{
+  width:8px;height:16px;
+  border:0;border-radius:0;
+  background:var(--ink);
+}
+input[type=range]:hover::-moz-range-thumb,
+input[type=range]:active::-moz-range-thumb{background:var(--accent)}
+input[type=range]:focus-visible{outline-offset:4px}
+
+/* Filmstrip */
+.filmstrip{
+  margin-top:auto;
+  display:flex;gap:var(--s1);
+  overflow-x:auto;overflow-y:hidden;
+  padding:var(--s1) 2px;
+  flex:none;
+  -webkit-overflow-scrolling:touch;
+}
+.filmstrip img{
+  display:block;
+  height:56px;width:auto;
+  flex:none;
+  object-fit:contain;
+  opacity:.6;
+  cursor:pointer;
+}
+.filmstrip img:hover{opacity:.85}
+.filmstrip img.active{opacity:1;outline:2px solid var(--accent);outline-offset:-2px}
+
+/* Toast: the user-message bar. */
+.toast{
+  position:fixed;left:50%;bottom:calc(var(--s5) + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  z-index:50;
+  display:block;
+  min-height:var(--target);
+  line-height:var(--target);
+  max-width:calc(100vw - var(--s6));
+  padding:0 var(--s4);
+  background:var(--bg-2);
+  color:var(--ink);
+  border:0;border-radius:0;
+  font-size:13px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.toast::before{content:"● ";white-space:pre;color:var(--accent)}
+
+/* ---------- Responsive ---------- */
+@media (max-width:959px){
+  .view.editor{
+    grid-template-columns:1fr;
+    grid-template-rows:var(--bar) 58dvh minmax(0,1fr);
+  }
+  .stage{min-height:58dvh}
+  .stage::after{
+    top:auto;left:0;right:0;bottom:0;
+    width:auto;height:var(--s6);
+    background:linear-gradient(180deg,transparent,var(--edge-soft,var(--bg)));
+  }
+  .rail{width:100%;min-height:0;max-height:none}
+}
+@media (max-width:599px){
+  .topbar,.ed-top{padding:0 var(--s4)}
+  .view{padding:var(--s4)}
+  .view.editor{padding:0}
+  .stage-wrap{padding:var(--s4)}
+  .rail{padding:var(--s4)}
+  .album-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .ed-top{gap:var(--s1)}
+  .ed-actions{gap:0}
+  .btn{padding:0 var(--s2)}
+  .ed-top .btn{padding:0 var(--s1)}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important;animation:none !important;scroll-behavior:auto !important}
+  .cursor{animation:none}
+}
+
+/* Crop mode: inset the photo clear of the fade (as iOS does), and draw the fade above
+   the dimming so stage and rail still meet without a seam. */
+.editor.cropping .stage-wrap{padding-right:140px}
+.editor.cropping .stage::after{z-index:3}
+@media (max-width:959px){
+  .editor.cropping .stage-wrap{padding-right:var(--s5);padding-bottom:calc(var(--s6) + var(--s2))}
+}
+
+/* ---------- Selection mode ---------- */
+.select-bar{
+  position:sticky;top:0;z-index:5;
+  display:flex;flex-wrap:wrap;align-items:center;gap:var(--s2);
+  margin-bottom:var(--s5);
+  padding:0 var(--s2);
+  border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);
+  background:var(--bg);
+}
+.select-bar .chev{color:var(--mode)}
+.sel-count{margin-right:auto;color:var(--ink);font-variant-numeric:tabular-nums}
+.btn.danger:not(:disabled):hover{color:var(--danger)}
+.btn:disabled{opacity:.4;cursor:default;pointer-events:none}
+.selecting .card-actions{display:none}
+.selecting .photo-card::before{
+  content:"";position:absolute;top:var(--s2);right:var(--s2);z-index:1;
+  width:20px;height:20px;
+  border:1px solid var(--ink);background:rgba(0,0,0,.35);
+}
+.selecting .photo-card.selected::before{
+  content:"✓";display:flex;align-items:center;justify-content:center;
+  background:var(--accent);border-color:var(--accent);color:var(--bg);font-size:13px;font-weight:700;
+}
+.selecting .photo-card.selected img{opacity:.75}
+.selecting .photo-card.selected{outline:2px solid var(--accent);outline-offset:-2px}
+#btnSelect.active{color:var(--mode)}
+
+/* ---------- Busy states: braille spinner driven from JS ---------- */
+.toast.busy{color:var(--accent-2)}
+.toast.busy::before{content:none}
+.toast .spin,.btn .spin{color:var(--accent);display:inline-block;width:1ch;margin-right:1ch}
+.toast .toast-action{
+  margin-left:var(--s4);padding:0 var(--s2);min-height:32px;
+  border:0;background:transparent;color:var(--accent);font:inherit;cursor:pointer;
+}
+.toast .toast-action:hover{color:var(--accent-2);background:rgba(255,255,255,.06)}
+#btnDownloadAlbum.busy{opacity:1;color:var(--accent-2);pointer-events:none;font-variant-numeric:tabular-nums}
+
+/* ---------- Filters (iOS-style strip) ---------- */
+.filters-panel{display:flex;flex-direction:column;gap:var(--s5);min-width:0}
+.filter-row{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:var(--s3) var(--s2);
+}
+.filter{
+  display:flex;flex-direction:column;align-items:stretch;gap:var(--s1);
+  min-width:0;padding:0;border:0;border-radius:0;
+  background:transparent;color:var(--muted);font:inherit;font-size:11px;cursor:pointer;
+}
+.filter-thumb{
+  display:block;width:100%;aspect-ratio:1/1;height:auto;
+  background:var(--bg-2);
+  outline:2px solid transparent;outline-offset:-2px;
+}
+.filter-name{text-align:left;line-height:1.3;overflow-wrap:anywhere}
+.filter-name::before{content:"❯ ";white-space:pre;color:transparent}
+.filter:hover{color:var(--ink)}
+.filter.active{color:var(--ink)}
+.filter.active .filter-name::before{color:var(--accent)}
+.filter.active .filter-thumb{outline-color:var(--accent)}
+.filter-amount[hidden]{display:none}
+@media (max-width:959px){
+  .filter-row{display:flex;overflow-x:auto;gap:var(--s2);padding-bottom:var(--s1)}
+  .filter{flex:0 0 96px}
+}
+@media (max-width:599px){
+  /* Top bar is Cancel · Duplicate · Reset · Done on phones; the filename would only be a sliver. */
+  .ed-name{display:none}
+  .ed-top{justify-content:space-between}
+}
+
+/* ---------- Crop view (iOS-style settle) ----------
+   JS zooms canvas + crop layer together with a CSS transform so the crop fills the stage.
+   Settled: the cut area becomes solid background. While dragging: dimmed, so it can be pulled back in. */
+#glCanvas,.crop-layer{transform-origin:50% 50%}
+.stage-wrap.crop-anim #glCanvas,.stage-wrap.crop-anim .crop-layer{transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+.stage-wrap.crop-settled .crop-box{--crop-dim:var(--bg)}
+@media (prefers-reduced-motion:reduce){
+  .stage-wrap.crop-anim #glCanvas,.stage-wrap.crop-anim .crop-layer{transition:none}
+}
+
+/* ---------- Inspect zoom (adjust / filters) ----------
+   Click zooms in at the pointer, drag pans, the wheel zooms back out. */
+.editor:not(.cropping) #glCanvas{cursor:zoom-in;touch-action:none}
+.editor:not(.cropping) .stage-wrap.zoomed #glCanvas{cursor:grab}
+.editor:not(.cropping) .stage-wrap.panning #glCanvas{cursor:grabbing}
+.stage-wrap.zoom-anim #glCanvas{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){
+  .stage-wrap.zoom-anim #glCanvas{transition:none}
+}
+.ed-history{display:flex;gap:0}
+.ed-history .btn{min-width:var(--target);padding:0 var(--s2);font-size:20px;line-height:1}
+
+/* ---------- Photo-to-photo arrows (editor) ---------- */
+.nav-arrow{
+  position:absolute;top:50%;z-index:4;
+  width:var(--target);height:72px;margin-top:-36px;
+  display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:0;
+  background:rgba(41,44,51,.72);color:var(--ink);
+  font:inherit;font-size:28px;line-height:1;cursor:pointer;
+  opacity:0;transition:opacity .15s;
+}
+.nav-arrow.prev{left:0}
+.nav-arrow.next{right:0}
+.nav-arrow:hover{color:var(--accent)}
+.stage:hover .nav-arrow:not(:disabled),.nav-arrow:focus-visible{opacity:1}
+.nav-arrow:disabled{display:none}
+.editor.cropping .nav-arrow{display:none}
+@media (hover:none){.nav-arrow{opacity:1}}
+
+/* ---------- Export menu (Claude Code selection list) ---------- */
+.menu{
+  position:fixed;z-index:60;
+  min-width:300px;max-width:calc(100vw - var(--s5));
+  display:flex;flex-direction:column;
+  padding:var(--s2) 0;
+  background:var(--bg-2);border:1px solid var(--rule);border-radius:0;
+}
+.menu-title{padding:var(--s1) var(--s4) var(--s2);color:var(--muted);font-size:12px}
+.menu-item{
+  display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  min-height:var(--target);padding:var(--s2) var(--s4);
+  border:0;border-radius:0;background:transparent;
+  color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;
+}
+.menu-item .mi-label::before{content:"❯ ";white-space:pre;color:transparent}
+.menu-item .mi-hint{padding-left:2ch;font-size:11px;color:var(--muted)}
+.menu-item.active{color:var(--ink);background:rgba(255,255,255,.04)}
+.menu-item.active .mi-label::before{color:var(--accent)}
+.menu-item[aria-disabled="true"]{cursor:default;opacity:.55}
+.menu-item[aria-disabled="true"] .mi-hint{color:var(--danger)}
+
+/* ---------- Text tool ----------
+   Gizmo: dashed hairline around each text quad, solid for the selected one; square white
+   handles (pin corners, scale) and a ↻ rotate handle. Panel: the usual groups, chips and sliders. */
+.text-layer{position:absolute;z-index:2;touch-action:none;cursor:crosshair}
+.tx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.tx-quad{
+  fill:transparent;pointer-events:none;
+  stroke:var(--crop-grid);stroke-width:1;stroke-dasharray:4 4;
+  vector-effect:non-scaling-stroke;
+}
+.tx-quad.sel{stroke:var(--crop-edge);stroke-dasharray:none}
+.tx-handles{position:absolute;inset:0;pointer-events:none}
+.tx-h{
+  position:absolute;
+  width:44px;height:44px;margin:-22px 0 0 -22px;
+  pointer-events:auto;touch-action:none;
+}
+.tx-h::before{
+  content:'';
+  position:absolute;left:17px;top:17px;
+  width:10px;height:10px;
+  background:var(--white);
+  outline:1px solid var(--crop-dim);
+}
+.tx-h.scale{cursor:nwse-resize}
+.tx-h.pin{cursor:move}
+.tx-h.pin::before{left:16px;top:16px;width:12px;height:12px;background:var(--accent)}
+.tx-h.rot{cursor:grab}
+.tx-h.rot::before{
+  content:'↻';
+  left:10px;top:10px;width:24px;height:24px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg-2);color:var(--ink);outline:0;
+  font-size:14px;line-height:1;
+}
+.tx-h.rot:active{cursor:grabbing}
+
+.text-panel{display:flex;flex-direction:column;gap:var(--s5)}
+.tx-actions{display:flex;flex-wrap:wrap;gap:var(--s2);align-items:center}
+.tx-list{display:flex;flex-direction:column}
+.tx-item{
+  display:block;width:100%;
+  text-align:left;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.chip.font{font-size:15px}
+/* The text box is a Claude Code prompt: rule hairlines above and below, block caret. */
+.tx-input{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.tx-input textarea{
+  display:block;width:100%;min-height:var(--target);
+  padding:var(--s2) var(--s1);
+  border:0;border-radius:0;outline:none;resize:vertical;
+  background:transparent;color:var(--ink);
+  font:inherit;font-size:14px;line-height:1.4;
+}
+.tx-input:focus-within textarea{background:var(--bg-2)}
+.tx-color{
+  display:flex;align-items:center;justify-content:space-between;gap:var(--s2);
+  min-height:var(--target);
+  font-size:12px;cursor:pointer;
+}
+.tx-color i{font-style:normal;color:var(--muted)}
+.tx-color:hover i{color:var(--ink)}
+.tx-color input{
+  -webkit-appearance:none;appearance:none;
+  width:44px;height:24px;padding:0;
+  border:0;border-radius:0;background:transparent;cursor:pointer;
+}
+.tx-color input::-webkit-color-swatch-wrapper{padding:0}
+.tx-color input::-webkit-color-swatch{border:0;border-radius:0}
+.tx-color input::-moz-color-swatch{border:0;border-radius:0}

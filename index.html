@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#292c33" />
+<title>nomi · photo editor</title>
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 8.5V3h5.5M15.5 3H21v5.5M21 15.5V21h-5.5M8.5 21H3v-5.5" stroke="var(--accent)" stroke-width="2.25" stroke-linecap="square"/><rect class="logo-cursor" x="9.75" y="7.5" width="4.5" height="9" fill="var(--ink)"/></svg>
+    nomi
+  </div>
+  <span id="crumb" class="crumb">albums</span>
+  <button id="btnDownloadAlbum" class="btn ghost hidden" aria-haspopup="menu">↓ export</button>
+</header>
+
+<main id="viewAlbums" class="view">
+  <header class="page-head">
+    <div class="page-titles">
+      <h1 class="title">albums</h1>
+      <p class="sub">session-only · nothing leaves this tab</p>
+    </div>
+    <div class="actions">
+      <button id="btnNewAlbum" class="btn primary">New album</button>
+      <button id="btnOpenFolder" class="btn ghost hidden" title="Make an album from a folder; edits can be saved back to it (Chrome/Edge)">open folder</button>
+      <button id="btnDemo" class="btn ghost">How it works</button>
+    </div>
+  </header>
+  <aside class="notice" role="note" aria-label="How nomi stores photos">
+    <p class="t-line"><span class="warn" aria-hidden="true">●</span> heads up: everything lives in this tab's memory (RAM)</p>
+    <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> your original files are only read, never changed — unless you choose export → save to folder (photos opened with “open folder”, Chrome/Edge); the untouched originals are then kept in .nomi-originals. otherwise nomi keeps only thumbnails + edit settings in memory; nothing is uploaded.</p>
+    <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> reloading or closing the tab loses all albums and edits. export before you leave.</p>
+    <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> don't load too much at once: a few hundred photos is fine, but a zip of 100+ full-res photos can need gigabytes of RAM and may crash the tab. export in smaller selections.</p>
+  </aside>
+  <section id="albumGrid" class="album-grid" aria-label="Albums"></section>
+  <section id="emptyAlbums" class="empty">
+    <p class="t-line"><span class="dot" aria-hidden="true">●</span> no albums yet</p>
+    <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> create one to start. everything vanishes on reload.</p>
+    <p class="t-prompt"><span class="chev" aria-hidden="true">❯</span> <span class="cursor" aria-hidden="true"></span></p>
+  </section>
+</main>
+
+<main id="viewAlbum" class="view hidden">
+  <header class="page-head">
+    <div class="page-titles">
+      <div class="prompt-line"><span class="chev" aria-hidden="true">❯</span><input id="albumName" class="album-name" value="" maxlength="60" aria-label="Album name" /></div>
+      <div id="albumMeta" class="sub">0 photos</div>
+    </div>
+    <div class="actions">
+      <label class="btn primary file-btn">Import photos<input id="fileInput" type="file" accept="image/*,.heic,.heif" multiple /></label>
+      <button id="btnSelect" class="btn ghost">select</button>
+      <button id="btnBackAlbums" class="btn ghost">‹ albums</button>
+    </div>
+  </header>
+  <div id="dropHint" class="drop" role="button" tabindex="0"><span class="chev" aria-hidden="true">❯</span> drop images anywhere · or click to browse<span class="cursor" aria-hidden="true"></span></div>
+  <div id="selectBar" class="select-bar hidden" role="toolbar" aria-label="Selection">
+    <span class="chev" aria-hidden="true">❯</span>
+    <span id="selCount" class="sel-count">0 selected</span>
+    <button id="btnSelAll" class="btn ghost">select all</button>
+    <button id="btnSelExport" class="btn primary" disabled>export selected</button>
+    <button id="btnSelDelete" class="btn ghost danger" disabled>delete</button>
+    <button id="btnSelDone" class="btn ghost">cancel</button>
+  </div>
+  <section id="photoGrid" class="photo-grid" aria-label="Photos"></section>
+</main>
+
+<main id="viewEditor" class="view editor hidden">
+  <div class="ed-top">
+    <button id="btnBackAlbum" class="btn ghost">Cancel</button>
+    <div class="ed-history">
+      <button id="btnUndo" class="btn ghost" aria-label="Undo" title="Undo (⌘Z)" disabled>↶</button>
+      <button id="btnRedo" class="btn ghost" aria-label="Redo" title="Redo (⇧⌘Z)" disabled>↷</button>
+    </div>
+    <div id="edName" class="ed-name">photo.jpg</div>
+    <div class="actions ed-actions">
+      <button id="btnDuplicate" class="btn ghost">Duplicate</button>
+      <button id="btnReset" class="btn ghost">Reset</button>
+      <button id="btnDone" class="btn primary">Done</button>
+    </div>
+  </div>
+  <section class="stage" aria-label="Photo stage">
+    <button id="btnPrev" class="nav-arrow prev" type="button" aria-label="Previous photo" title="Previous (←)">‹</button>
+    <button id="btnNext" class="nav-arrow next" type="button" aria-label="Next photo" title="Next (→)">›</button>
+    <div id="stageWrap" class="stage-wrap">
+      <canvas id="glCanvas"></canvas>
+      <div id="cropLayer" class="crop-layer hidden">
+        <div id="cropBox" class="crop-box">
+          <span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span>
+        </div>
+      </div>
+      <div id="textLayer" class="text-layer hidden" aria-label="Text layers on the photo"></div>
+    </div>
+  </section>
+  <section class="rail" aria-label="Editing tools">
+    <div class="tabs" role="tablist" aria-label="Tool groups">
+      <button id="tabAdjust" class="tab active" role="tab" aria-selected="true">adjust</button>
+      <button id="tabFilters" class="tab" role="tab" aria-selected="false">filters</button>
+      <button id="tabCrop" class="tab" role="tab" aria-selected="false">crop</button>
+      <button id="tabText" class="tab" role="tab" aria-selected="false">text</button>
+    </div>
+    <div id="panelAdjust" class="adjust-list" role="tabpanel" aria-label="Adjustments"></div>
+    <div id="panelFilters" class="filters-panel hidden" role="tabpanel" aria-label="Filters"></div>
+    <div id="panelCrop" class="crop-panel hidden" role="tabpanel" aria-label="Crop tools">
+      <div class="group">
+        <div class="group-title">aspect</div>
+        <div id="aspectRow" class="chips" role="group" aria-label="Aspect ratio"></div>
+      </div>
+      <div class="group">
+        <div class="group-title">rotate</div>
+        <div><button id="btnRot" class="btn ghost">⟲ 90°</button></div>
+        <label class="slider straighten"><span><i>straighten</i> <b id="vStraighten">0°</b></span>
+          <input id="inStraighten" type="range" min="-45" max="45" step="0.5" value="0" aria-label="Straighten" />
+        </label>
+      </div>
+      <p class="hint">drag the box or its corners · it settles to fill the view · ⌘Z to undo</p>
+    </div>
+    <div id="panelText" class="text-panel hidden" role="tabpanel" aria-label="Text"></div>
+    <div id="filmstrip" class="filmstrip" aria-label="Photos in album"></div>
+  </section>
+</main>
+
+<div id="exportMenu" class="menu hidden" role="menu" aria-labelledby="exportTitle">
+  <div id="exportTitle" class="menu-title">export</div>
+  <button class="menu-item" role="menuitem" data-choice="folder"><span class="mi-label">save to folder</span><span class="mi-hint"></span></button>
+  <button class="menu-item" role="menuitem" data-choice="zip"><span class="mi-label">download zip</span><span class="mi-hint">full-res copies · originals untouched</span></button>
+</div>
+<div id="toast" class="toast hidden" role="status"></div>
+<script type="module" src="./src/app.js"></script>
+</body>
+</html>
