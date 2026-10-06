@@ -4,6 +4,7 @@
 import { renderFullRes } from './exporter.js';
 import { copyExif } from './exif.js';
 import { looksLikeImage } from './importer.js';
+import { isEdited } from './store.js';
 
 export const BACKUP_DIR = '.nomi-originals';
 
@@ -74,9 +75,14 @@ export async function saveInPlace(photo) {
   const fmt = formatFor(photo.name);
   if (!fmt) return { status: 'skipped', reason: "format can't be written back — use zip" };
   // Read everything from the original before anything on disk changes.
-  const { blob } = await renderFullRes(photo, undefined, fmt);
-  let bytes = new Uint8Array(await blob.arrayBuffer());
-  if (fmt.mime === 'image/jpeg') bytes = copyExif(new Uint8Array(await photo.file.arrayBuffer()), bytes);
+  // Nothing edited (e.g. reset after a save): put the original bytes back instead of a lossy re-encode.
+  let bytes;
+  if (!isEdited(photo)) bytes = new Uint8Array(await photo.file.arrayBuffer());
+  else {
+    const { blob } = await renderFullRes(photo, undefined, fmt);
+    bytes = new Uint8Array(await blob.arrayBuffer());
+    if (fmt.mime === 'image/jpeg') bytes = copyExif(new Uint8Array(await photo.file.arrayBuffer()), bytes);
+  }
   let handle = photo.handle, status = 'saved';
   if (handle && !photo.createdHere) {
     await backupOriginal(photo.dir, handle.name, photo.file);

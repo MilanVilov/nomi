@@ -41,6 +41,22 @@ export function isEdited(ph) {
   return false;
 }
 
+// Stable text form of params (key order independent), to tell "same edit" from "changed".
+export function paramsSig(p) {
+  const sort = (v) => (Array.isArray(v) ? v.map(sort)
+    : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])])) : v);
+  return JSON.stringify(sort(p));
+}
+
+// Would "save to folder" write this photo? Folder photos whose edit differs from what is on disk
+// (ph.savedParams = params at the last save), plus copies that have no file yet.
+export function needsSave(ph) {
+  if (!ph || !ph.dir) return false;
+  if (!ph.handle) return true;
+  if (!ph.savedParams) return isEdited(ph);
+  return paramsSig(ph.params) !== paramsSig(ph.savedParams);
+}
+
 export function clampCrop(c) {
   const x = Math.min(0.95, Math.max(0, c.x));
   const y = Math.min(0.95, Math.max(0, c.y));
@@ -70,6 +86,8 @@ export function duplicatePhoto(id) {
   const copy = { ...src, id: uid('ph'), name: copyName(src.name, taken), params: structuredClone(src.params), dirty: false };
   // A copy shares the folder but never the source's file handle: saving it creates a new file.
   delete copy.handle;
+  delete copy.savedParams;
+  delete copy.createdHere;
   state.photos.set(copy.id, copy);
   album.photoIds.splice(album.photoIds.indexOf(id) + 1, 0, copy.id);
   return copy;

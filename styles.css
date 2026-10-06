@@ -15,12 +15,21 @@
   --danger:#ff6b80; /* Claude Code error red */
   --code:#a4cbfa; /* paths / inline code in the terminal; used for photo filenames */
   --mode:#f7ce46;
+  --hover:rgba(255,255,255,.06); /* row hover on top of --bg-2 */
   --scrim:rgba(0,0,0,.6);
+  --veil:rgba(41,44,51,.72); /* --bg at 72%: arrows floating over the photo */
+  --check:rgba(0,0,0,.35); /* unselected checkbox ground over a photo */
   /* Crop overlay (unchanged). */
   --white:#ffffff;
   --crop-dim:rgba(0,0,0,.55);
   --crop-edge:rgba(255,255,255,.9);
   --crop-grid:rgba(255,255,255,.35);
+
+  /* Motion: one curve, three durations. Animate opacity and transform only. */
+  --ease-out:cubic-bezier(.2,.8,.2,1);
+  --dur-fast:.12s; /* hover, press, small state changes */
+  --dur-med:.16s; /* view enter, panels, menu, toast, inspect zoom */
+  --dur-slow:.38s; /* crop settle */
 
   --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
   --bar:52px;
@@ -31,6 +40,8 @@
 
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
+/* Thin tokenized scrollbars (rail, filmstrip, filter strip). */
+*{scrollbar-width:thin;scrollbar-color:var(--rule) transparent}
 body{
   margin:0;
   min-height:100dvh;
@@ -41,6 +52,10 @@ body{
   font-weight:400;
   line-height:1.4;
   -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
 }
 h1,h2,h3,p{margin:0}
 button,input{font:inherit;color:inherit}
@@ -51,6 +66,9 @@ input,textarea{caret-color:var(--ink);caret-shape:block}
 
 /* ---------- Glyphs ---------- */
 .chev{color:var(--muted)}
+.dot{color:var(--ink)}
+.elbow{color:var(--muted)}
+::selection{background:var(--accent);color:var(--bg)}
 .cursor{
   display:inline-block;width:8px;height:16px;
   vertical-align:text-bottom;
@@ -58,6 +76,12 @@ input,textarea{caret-color:var(--ink);caret-shape:block}
   animation:blink 1s steps(1) infinite;
 }
 @keyframes blink{50%{opacity:0}}
+/* Enter animations run whenever an element goes from .hidden (display:none) to shown. */
+@keyframes fade-in{from{opacity:0}}
+@keyframes rise-in{from{opacity:0;transform:translateY(6px)}}
+@keyframes pop-in{from{opacity:0;transform:scale(.6)}}
+@keyframes photo-in{from{opacity:.3}}
+@keyframes toast-in{from{opacity:0;transform:translate(-50%,8px)}}
 
 /* ---------- Buttons: terminal text, not boxes ---------- */
 .btn,.tab,.chip{
@@ -73,13 +97,14 @@ input,textarea{caret-color:var(--ink);caret-shape:block}
   color:var(--muted);
   font-size:14px;
   white-space:nowrap;
+  transition:background-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out),opacity var(--dur-fast) var(--ease-out);
 }
 .btn:hover{background:var(--bg-2);color:var(--ink)}
 .btn.primary{color:var(--accent)}
 .btn.primary::before{content:"[ ";white-space:pre}
 .btn.primary::after{content:" ]";white-space:pre}
 .btn.primary:hover{background:var(--bg-2);color:var(--accent-2)}
-.btn:active{opacity:.85}
+.btn:active{opacity:.7}
 
 /* Import: the real file input covers the whole button. */
 .file-btn{position:relative;overflow:hidden}
@@ -107,6 +132,9 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
 
 /* ---------- Views ---------- */
 .view{max-width:1200px;margin:0 auto;padding:var(--s5)}
+/* View change: a short fade + 6px rise. The editor only fades (its stage is measured on open). */
+.view:not(.hidden){animation:rise-in var(--dur-med) var(--ease-out)}
+.view.editor:not(.hidden){animation:fade-in var(--dur-med) var(--ease-out)}
 
 .page-head{
   display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
@@ -132,6 +160,7 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   display:flex;flex-direction:column;gap:var(--s1);
   cursor:pointer;
   min-height:var(--target);
+  -webkit-tap-highlight-color:transparent;
 }
 .album-card .thumbs{
   display:flex;gap:2px;align-items:flex-start;
@@ -146,11 +175,13 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   border-radius:2px;
 }
 .album-card h3{
+  transition:color var(--dur-fast) var(--ease-out);
   font-size:14px;font-weight:400;color:var(--ink);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .album-card h3::before{content:"● ";white-space:pre;color:var(--ink)}
 .album-card:hover h3{color:var(--accent)}
+.album-card:active h3{color:var(--accent-2)}
 .album-card .meta{color:var(--muted);font-size:11px}
 
 /* Empty state: a Claude Code transcript. */
@@ -186,7 +217,9 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   background:transparent;
   outline:none;
   caret-color:var(--ink);caret-shape:block;
+  transition:background-color var(--dur-fast) var(--ease-out);
 }
+.album-name:hover{background:var(--bg-2)}
 .album-name:focus,.album-name:focus-visible{background:var(--bg-2);outline:none}
 
 .drop{
@@ -198,15 +231,26 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   color:var(--muted);font-size:14px;
   cursor:pointer;
 }
+.drop{transition:color var(--dur-fast) var(--ease-out)}
 .drop:hover{color:var(--ink)}
+.drop:active{color:var(--accent-2)}
 .drop .cursor{margin-left:var(--s2)}
+.drop .short{display:none}
+@media (max-width:599px){.drop .long{display:none}.drop .short{display:inline}}
 
 .photo-grid{display:flex;flex-direction:column;gap:2px;min-width:0}
 .photo-row{display:flex;gap:2px;overflow:hidden}
 .photo-card{position:relative;flex:none;overflow:hidden;cursor:pointer;background:var(--bg-2);border-radius:2px}
-.photo-card img{display:block;width:100%;height:100%;object-fit:cover}
+.photo-card img{
+  display:block;width:100%;height:100%;object-fit:cover;
+  /* Loaded thumbs fade in (JS adds .loaded; --i staggers the first 12 new cards). */
+  opacity:0;
+  transition:opacity var(--dur-med) var(--ease-out),transform var(--dur-slow) var(--ease-out);
+}
+.photo-card img.loaded{opacity:1}
+@media (hover:hover){.photo-card:not(:active):hover img{transform:scale(1.02)}}
 /* Name + card actions appear on hover/focus; actions always visible on touch screens. */
-.photo-card .nm,.photo-card .card-actions{position:absolute;opacity:0;transition:opacity .12s}
+.photo-card .nm,.photo-card .card-actions{position:absolute;opacity:0;transition:opacity var(--dur-fast) var(--ease-out)}
 .photo-card .nm{
   left:0;right:0;bottom:0;
   padding:var(--s4) var(--s2) var(--s2);
@@ -221,7 +265,9 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   border:0;border-radius:0;
   background:var(--bg-2);color:var(--ink);
   font:inherit;font-size:13px;cursor:pointer;
+  transition:color var(--dur-fast) var(--ease-out);
 }
+.card-actions button:active{color:var(--accent-2)}
 .card-actions .dup:hover{color:var(--accent)}
 .card-actions .del:hover{color:var(--danger)}
 .photo-card:hover .nm,.photo-card:hover .card-actions,.photo-card:focus-within .card-actions{opacity:1}
@@ -232,6 +278,10 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   width:8px;height:8px;border-radius:50%;
   background:var(--accent);
 }
+/* The card you just left the editor from: 2px accent outline that fades (JS drops the class after
+   1.4s; with reduced motion there is no fade, the outline just disappears). */
+.photo-card.just-edited{outline:2px solid var(--accent);outline-offset:-2px;animation:found 1.4s ease-out forwards}
+@keyframes found{0%,55%{outline-color:var(--accent)}100%{outline-color:transparent}}
 
 /* ---------- Editor ---------- */
 .view.editor{
@@ -284,13 +334,14 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   background:var(--bg);
 }
 #glCanvas{display:block;max-width:100%;max-height:100%;flex:none}
+#glCanvas.photo-in{animation:photo-in var(--dur-med) var(--ease-out)}
 
 .crop-layer{position:absolute;z-index:2}
 .crop-box{
   position:absolute;
   box-shadow:0 0 0 9999px var(--crop-dim);
   outline:calc(1px * var(--inv,1)) solid var(--crop-edge);
-  transition:box-shadow .25s ease;
+  transition:box-shadow var(--dur-med) var(--ease-out);
   cursor:move;
   touch-action:none;
 }
@@ -303,8 +354,9 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
     linear-gradient(to bottom,transparent calc(33.333% - var(--gw)),var(--crop-grid) calc(33.333% - var(--gw)),var(--crop-grid) calc(33.333% + var(--gw)),transparent calc(33.333% + var(--gw)),transparent calc(66.666% - var(--gw)),var(--crop-grid) calc(66.666% - var(--gw)),var(--crop-grid) calc(66.666% + var(--gw)),transparent calc(66.666% + var(--gw)));
 }
 .crop-box .h{
+  /* --hs (set on .crop-box by crop.js): hit-area size in SCREEN px, 44 unless the box is tiny so corners never overlap */
   position:absolute;
-  width:44px;height:44px;
+  width:var(--hs,44px);height:var(--hs,44px);
   touch-action:none;
   z-index:1;
   /* Keep brackets and hit areas screen-sized while the crop view is zoomed. */
@@ -315,16 +367,30 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   position:absolute;
   width:22px;height:22px;
   border:0 solid var(--white);
+  pointer-events:none; /* bars/brackets are visual only: they must never steal a corner grab */
 }
-.h.tl{top:-22px;left:-22px;cursor:nwse-resize}
-.h.tr{top:-22px;right:-22px;cursor:nesw-resize}
-.h.bl{bottom:-22px;left:-22px;cursor:nesw-resize}
-.h.br{bottom:-22px;right:-22px;cursor:nwse-resize}
+.h.tl{top:calc(var(--hs,44px) / -2);left:calc(var(--hs,44px) / -2);cursor:nwse-resize}
+.h.tr{top:calc(var(--hs,44px) / -2);right:calc(var(--hs,44px) / -2);cursor:nesw-resize}
+.h.bl{bottom:calc(var(--hs,44px) / -2);left:calc(var(--hs,44px) / -2);cursor:nesw-resize}
+.h.br{bottom:calc(var(--hs,44px) / -2);right:calc(var(--hs,44px) / -2);cursor:nwse-resize}
 /* Bracket's outer edge sits 3px outside the crop corner (hit-area centre = corner). */
-.h.tl::before{top:19px;left:19px;border-top-width:3px;border-left-width:3px}
-.h.tr::before{top:19px;right:19px;border-top-width:3px;border-right-width:3px}
-.h.bl::before{bottom:19px;left:19px;border-bottom-width:3px;border-left-width:3px}
-.h.br::before{bottom:19px;right:19px;border-bottom-width:3px;border-right-width:3px}
+.h.tl::before{top:calc(var(--hs,44px) / 2 - 3px);left:calc(var(--hs,44px) / 2 - 3px);border-top-width:3px;border-left-width:3px}
+.h.tr::before{top:calc(var(--hs,44px) / 2 - 3px);right:calc(var(--hs,44px) / 2 - 3px);border-top-width:3px;border-right-width:3px}
+.h.bl::before{bottom:calc(var(--hs,44px) / 2 - 3px);left:calc(var(--hs,44px) / 2 - 3px);border-bottom-width:3px;border-left-width:3px}
+.h.br::before{bottom:calc(var(--hs,44px) / 2 - 3px);right:calc(var(--hs,44px) / 2 - 3px);border-bottom-width:3px;border-right-width:3px}
+
+/* Handles fade in when the crop tab opens. */
+.crop-layer:not(.hidden) .crop-box .h{animation:fade-in var(--dur-med) var(--ease-out)}
+
+/* Edge handles: --hs thick hit strips between the corner hit areas (corners win, they paint later);
+   a short white 3px bar marks each side. Length compensates --inv so the strip ends at the corner zones. */
+.h.t,.h.b,.h.l,.h.r{--len:calc((100% - var(--hs,44px) * var(--inv,1)) / var(--inv,1))}
+.h.t,.h.b{left:50%;top:calc(var(--hs,44px) / -2);width:var(--len);height:var(--hs,44px);transform:translateX(-50%) scale(var(--inv,1));cursor:ns-resize}
+.h.b{top:auto;bottom:calc(var(--hs,44px) / -2)}
+.h.l,.h.r{top:50%;left:calc(var(--hs,44px) / -2);height:var(--len);width:var(--hs,44px);transform:translateY(-50%) scale(var(--inv,1));cursor:ew-resize}
+.h.r{left:auto;right:calc(var(--hs,44px) / -2)}
+.h.t::before,.h.b::before{width:28px;height:0;left:calc(50% - 14px);top:calc(50% - 1.5px);border-top-width:3px}
+.h.l::before,.h.r::before{height:28px;width:0;top:calc(50% - 14px);left:calc(50% - 1.5px);border-left-width:3px}
 
 .rail{
   min-width:0;min-height:0;
@@ -342,9 +408,14 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   background:transparent;
   color:var(--muted);
   font-size:14px;
+  transition:color var(--dur-fast) var(--ease-out);
 }
-.tab::before{content:"❯ ";white-space:pre;color:transparent}
+.tab::before{content:"❯ ";white-space:pre;color:transparent;transition:color var(--dur-fast) var(--ease-out)}
 .tab:hover{color:var(--ink)}
+.tab:not(.active):hover::before{color:var(--muted)}
+.tab:active{color:var(--accent-2)}
+/* Panels cross-fade when the tab changes. */
+.rail>[role=tabpanel]:not(.hidden){animation:fade-in var(--dur-med) var(--ease-out)}
 .tab.active{color:var(--ink)}
 .tab.active::before{color:var(--mode)}
 
@@ -359,8 +430,10 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   border:0;border-radius:0;
   background:transparent;color:var(--muted);
   font-size:12px;
+  transition:background-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out);
 }
-.chip::before{content:"❯ ";white-space:pre;color:transparent}
+.chip::before{content:"❯ ";white-space:pre;color:transparent;transition:color var(--dur-fast) var(--ease-out)}
+.chip:active{color:var(--accent-2)}
 .chip:hover{background:var(--bg-2);color:var(--ink)}
 .chip.active{background:var(--bg-2);color:var(--ink)}
 .chip.active::before{color:var(--accent)}
@@ -380,7 +453,9 @@ body:has(#viewEditor:not(.hidden)) .topbar{display:none}
   font-style:normal;color:var(--muted);
   min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-.slider span b{font-weight:400;color:var(--ink);text-align:right}
+.slider span b{font-weight:400;color:var(--ink);text-align:right;transition:color var(--dur-fast) var(--ease-out)}
+.slider span i{transition:color var(--dur-fast) var(--ease-out)}
+.slider:hover span i{color:var(--ink)}
 .slider.changed b{color:var(--accent)}
 .slider.changed i{color:var(--ink)}
 
@@ -401,9 +476,11 @@ input[type=range]::-webkit-slider-thumb{
   width:8px;height:16px;margin-top:-7px;
   border:0;border-radius:0;
   background:var(--ink);
+  transition:background-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out);
 }
-input[type=range]:hover::-webkit-slider-thumb,
-input[type=range]:active::-webkit-slider-thumb{background:var(--accent)}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--accent-2)}
+/* Dragging: the block cursor grows and turns accent. */
+input[type=range]:active::-webkit-slider-thumb{background:var(--accent);transform:scale(1.25,1.25)}
 input[type=range]::-moz-range-track{
   height:2px;border:0;
   background:linear-gradient(to right,var(--track) var(--lo,50%),var(--accent) var(--lo,50%),var(--accent) var(--hi,50%),var(--track) var(--hi,50%));
@@ -412,9 +489,10 @@ input[type=range]::-moz-range-thumb{
   width:8px;height:16px;
   border:0;border-radius:0;
   background:var(--ink);
+  transition:background-color var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out);
 }
-input[type=range]:hover::-moz-range-thumb,
-input[type=range]:active::-moz-range-thumb{background:var(--accent)}
+input[type=range]:hover::-moz-range-thumb{background:var(--accent-2)}
+input[type=range]:active::-moz-range-thumb{background:var(--accent);transform:scale(1.25,1.25)}
 input[type=range]:focus-visible{outline-offset:4px}
 
 /* Filmstrip */
@@ -433,9 +511,12 @@ input[type=range]:focus-visible{outline-offset:4px}
   object-fit:contain;
   opacity:.6;
   cursor:pointer;
+  outline:2px solid transparent;outline-offset:-2px;
+  transition:opacity var(--dur-fast) var(--ease-out),outline-color var(--dur-fast) var(--ease-out);
 }
 .filmstrip img:hover{opacity:.85}
-.filmstrip img.active{opacity:1;outline:2px solid var(--accent);outline-offset:-2px}
+.filmstrip img:active{opacity:1}
+.filmstrip img.active{opacity:1;outline-color:var(--accent)}
 
 /* Toast: the user-message bar. */
 .toast{
@@ -452,13 +533,17 @@ input[type=range]:focus-visible{outline-offset:4px}
   border:0;border-radius:0;
   font-size:13px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  animation:toast-in var(--dur-med) var(--ease-out);
+  transition:opacity var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out);
 }
+/* JS adds .leaving for one beat before it hides the toast. */
+.toast.leaving{opacity:0;transform:translate(-50%,8px);pointer-events:none}
 .toast::before{content:"● ";white-space:pre;color:var(--accent)}
 
 /* ---------- Responsive ---------- */
 @media (max-width:959px){
   .view.editor{
-    grid-template-columns:1fr;
+    grid-template-columns:minmax(0,1fr);
     grid-template-rows:var(--bar) 58dvh minmax(0,1fr);
   }
   .stage{min-height:58dvh}
@@ -482,7 +567,7 @@ input[type=range]:focus-visible{outline-offset:4px}
   .ed-top .btn{padding:0 var(--s1)}
 }
 @media (prefers-reduced-motion:reduce){
-  *{transition:none !important;animation:none !important;scroll-behavior:auto !important}
+  *,*::before,*::after{transition:none !important;animation:none !important;scroll-behavior:auto !important}
   .cursor{animation:none}
 }
 
@@ -511,13 +596,16 @@ input[type=range]:focus-visible{outline-offset:4px}
 .selecting .photo-card::before{
   content:"";position:absolute;top:var(--s2);right:var(--s2);z-index:1;
   width:20px;height:20px;
-  border:1px solid var(--ink);background:rgba(0,0,0,.35);
+  border:1px solid var(--ink);background:var(--check);
 }
 .selecting .photo-card.selected::before{
   content:"✓";display:flex;align-items:center;justify-content:center;
   background:var(--accent);border-color:var(--accent);color:var(--bg);font-size:13px;font-weight:700;
 }
+.selecting .photo-card.selected::before{animation:pop-in var(--dur-fast) var(--ease-out)}
 .selecting .photo-card.selected img{opacity:.75}
+.selecting .photo-card:hover::before{border-color:var(--accent)}
+.selecting .photo-card:hover img{transform:none}
 .selecting .photo-card.selected{outline:2px solid var(--accent);outline-offset:-2px}
 #btnSelect.active{color:var(--mode)}
 
@@ -528,8 +616,9 @@ input[type=range]:focus-visible{outline-offset:4px}
 .toast .toast-action{
   margin-left:var(--s4);padding:0 var(--s2);min-height:32px;
   border:0;background:transparent;color:var(--accent);font:inherit;cursor:pointer;
+  transition:background-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out);
 }
-.toast .toast-action:hover{color:var(--accent-2);background:rgba(255,255,255,.06)}
+.toast .toast-action:hover{color:var(--accent-2);background:var(--hover)}
 #btnDownloadAlbum.busy{opacity:1;color:var(--accent-2);pointer-events:none;font-variant-numeric:tabular-nums}
 
 /* ---------- Filters (iOS-style strip) ---------- */
@@ -547,7 +636,11 @@ input[type=range]:focus-visible{outline-offset:4px}
   display:block;width:100%;aspect-ratio:1/1;height:auto;
   background:var(--bg-2);
   outline:2px solid transparent;outline-offset:-2px;
+  transition:outline-color var(--dur-fast) var(--ease-out);
 }
+.filter{transition:color var(--dur-fast) var(--ease-out)}
+.filter:not(.active):hover .filter-thumb{outline-color:var(--rule)}
+.filter:active .filter-thumb{outline-color:var(--accent-2)}
 .filter-name{text-align:left;line-height:1.3;overflow-wrap:anywhere}
 .filter-name::before{content:"❯ ";white-space:pre;color:transparent}
 .filter:hover{color:var(--ink)}
@@ -569,23 +662,40 @@ input[type=range]:focus-visible{outline-offset:4px}
    JS zooms canvas + crop layer together with a CSS transform so the crop fills the stage.
    Settled: the cut area becomes solid background. While dragging: dimmed, so it can be pulled back in. */
 #glCanvas,.crop-layer{transform-origin:50% 50%}
-.stage-wrap.crop-anim #glCanvas,.stage-wrap.crop-anim .crop-layer{transition:transform .38s cubic-bezier(.2,.8,.2,1)}
+.stage-wrap.crop-anim #glCanvas,.stage-wrap.crop-anim .crop-layer{transition:transform var(--dur-slow) var(--ease-out)}
 .stage-wrap.crop-settled .crop-box{--crop-dim:var(--bg)}
 @media (prefers-reduced-motion:reduce){
   .stage-wrap.crop-anim #glCanvas,.stage-wrap.crop-anim .crop-layer{transition:none}
 }
 
 /* ---------- Inspect zoom (adjust / filters) ----------
-   Click zooms in at the pointer, drag pans, the wheel zooms back out. */
-.editor:not(.cropping) #glCanvas{cursor:zoom-in;touch-action:none}
-.editor:not(.cropping) .stage-wrap.zoomed #glCanvas{cursor:grab}
-.editor:not(.cropping) .stage-wrap.panning #glCanvas{cursor:grabbing}
-.stage-wrap.zoom-anim #glCanvas{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+   Click zooms in at the pointer, drag pans, the wheel zooms back out. Plain arrow cursor throughout. */
+.editor:not(.cropping) #glCanvas{touch-action:none}
+.stage-wrap.zoom-anim #glCanvas{transition:transform var(--dur-med) var(--ease-out)}
 @media (prefers-reduced-motion:reduce){
   .stage-wrap.zoom-anim #glCanvas{transition:none}
 }
 .ed-history{display:flex;gap:0}
 .ed-history .btn{min-width:var(--target);padding:0 var(--s2);font-size:20px;line-height:1}
+
+/* ---------- Original / edited compare ----------
+   Toggle in the top bar (or \). Pressed = chip-style active: --bg-2 + accent glyph. */
+.ed-history .btn.compare{font-size:14px;gap:var(--s2)}
+.btn.compare .cmp-glyph{font-size:16px}
+.btn.compare[aria-pressed="true"]{background:var(--bg-2);color:var(--ink)}
+.btn.compare[aria-pressed="true"] .cmp-glyph{color:var(--accent)}
+.orig-badge{
+  position:absolute;top:var(--s4);left:var(--s4);z-index:4;
+  padding:var(--s1) var(--s2);
+  background:var(--bg-2);color:var(--ink);font-size:12px;
+  pointer-events:none;
+}
+.orig-badge::before{content:"● ";white-space:pre;color:var(--accent)}
+.editor:not(.showing-original) .orig-badge{display:none}
+.editor.showing-original .text-layer{visibility:hidden}
+@media (max-width:599px){
+  .btn.compare .cmp-label{display:none}
+}
 
 /* ---------- Photo-to-photo arrows (editor) ---------- */
 .nav-arrow{
@@ -593,13 +703,15 @@ input[type=range]:focus-visible{outline-offset:4px}
   width:var(--target);height:72px;margin-top:-36px;
   display:flex;align-items:center;justify-content:center;
   border:0;border-radius:0;
-  background:rgba(41,44,51,.72);color:var(--ink);
+  background:var(--veil);color:var(--ink);
   font:inherit;font-size:28px;line-height:1;cursor:pointer;
-  opacity:0;transition:opacity .15s;
+  opacity:0;
+  transition:opacity var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out),background-color var(--dur-fast) var(--ease-out);
 }
 .nav-arrow.prev{left:0}
 .nav-arrow.next{right:0}
-.nav-arrow:hover{color:var(--accent)}
+.nav-arrow:hover{color:var(--accent);background:var(--bg-2)}
+.nav-arrow:active{color:var(--accent-2)}
 .stage:hover .nav-arrow:not(:disabled),.nav-arrow:focus-visible{opacity:1}
 .nav-arrow:disabled{display:none}
 .editor.cropping .nav-arrow{display:none}
@@ -613,16 +725,18 @@ input[type=range]:focus-visible{outline-offset:4px}
   padding:var(--s2) 0;
   background:var(--bg-2);border:1px solid var(--rule);border-radius:0;
 }
+.menu:not(.hidden){animation:rise-in var(--dur-med) var(--ease-out)}
 .menu-title{padding:var(--s1) var(--s4) var(--s2);color:var(--muted);font-size:12px}
 .menu-item{
   display:flex;flex-direction:column;align-items:flex-start;gap:2px;
   min-height:var(--target);padding:var(--s2) var(--s4);
   border:0;border-radius:0;background:transparent;
   color:var(--muted);font:inherit;font-size:13px;text-align:left;cursor:pointer;
+  transition:background-color var(--dur-fast) var(--ease-out),color var(--dur-fast) var(--ease-out);
 }
 .menu-item .mi-label::before{content:"❯ ";white-space:pre;color:transparent}
 .menu-item .mi-hint{padding-left:2ch;font-size:11px;color:var(--muted)}
-.menu-item.active{color:var(--ink);background:rgba(255,255,255,.04)}
+.menu-item.active{color:var(--ink);background:var(--hover)}
 .menu-item.active .mi-label::before{color:var(--accent)}
 .menu-item[aria-disabled="true"]{cursor:default;opacity:.55}
 .menu-item[aria-disabled="true"] .mi-hint{color:var(--danger)}
@@ -630,7 +744,7 @@ input[type=range]:focus-visible{outline-offset:4px}
 /* ---------- Text tool ----------
    Gizmo: dashed hairline around each text quad, solid for the selected one; square white
    handles (pin corners, scale) and a ↻ rotate handle. Panel: the usual groups, chips and sliders. */
-.text-layer{position:absolute;z-index:2;touch-action:none;cursor:crosshair}
+.text-layer{position:absolute;z-index:2;touch-action:none}
 .tx-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .tx-quad{
   fill:transparent;pointer-events:none;
@@ -688,7 +802,7 @@ input[type=range]:focus-visible{outline-offset:4px}
   min-height:var(--target);
   font-size:12px;cursor:pointer;
 }
-.tx-color i{font-style:normal;color:var(--muted)}
+.tx-color i{font-style:normal;color:var(--muted);transition:color var(--dur-fast) var(--ease-out)}
 .tx-color:hover i{color:var(--ink)}
 .tx-color input{
   -webkit-appearance:none;appearance:none;
@@ -698,3 +812,25 @@ input[type=range]:focus-visible{outline-offset:4px}
 .tx-color input::-webkit-color-swatch-wrapper{padding:0}
 .tx-color input::-webkit-color-swatch{border:0;border-radius:0}
 .tx-color input::-moz-color-swatch{border:0;border-radius:0}
+
+/* Phone editor bar: Cancel · ↶ ↷ ◐ · Duplicate · Reset · Done must fit 360px with no clipping. */
+@media (max-width:599px){
+  .ed-top{gap:0;padding:0 var(--s2)}
+  .ed-top .btn{padding:0 6px;font-size:13px}
+  .ed-history .btn{min-width:36px;padding:0 4px}
+  .ed-top .ed-history{margin-right:auto}
+}
+
+/* Toasts that carry actions (undo, delete from disk) wrap instead of clipping their buttons:
+   message on top, actions below on phones. The bullet moves onto the message so it stays inline. */
+.toast:has(.toast-action){
+  display:flex;flex-wrap:wrap;align-items:center;column-gap:var(--s2);
+  width:max-content;max-width:calc(100vw - var(--s6));
+  white-space:normal;line-height:1.4;padding:var(--s2) var(--s4);
+}
+.toast:has(.toast-action)::before{content:none}
+.toast:has(.toast-action) .toast-msg::before{content:"● ";white-space:pre;color:var(--accent)}
+.toast:has(.toast-action) .toast-action{margin-left:0}
+@media (max-width:599px){
+  .toast:has(.toast-action) .toast-msg{flex:1 1 100%}
+}

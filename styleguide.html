@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#292c33" />
+<meta name="robots" content="noindex" />
+<title>nomi · styleguide</title>
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./styles.css" />
+<style>
+/* Specimen scaffolding only. Real components come from styles.css; nothing here ships in the app. */
+.sg{display:flex;flex-direction:column;gap:var(--s6);padding-bottom:var(--s6)}
+.sg section{display:flex;flex-direction:column;gap:var(--s4)}
+.sg h2{font-size:14px;font-weight:500;color:var(--ink)}
+.sg h2::before{content:"● ";white-space:pre;color:var(--accent)}
+.sg .note{color:var(--muted);font-size:12px;max-width:80ch}
+.sg .note::before{content:"⎿ ";white-space:pre}
+.sg code{color:var(--code);font:inherit}
+.sg .row{display:flex;flex-wrap:wrap;gap:var(--s4);align-items:center}
+.sg .specimen{padding:var(--s4) 0;border-top:1px solid var(--line)}
+.sw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:var(--s2)}
+.sw{display:flex;align-items:stretch;gap:var(--s3);min-height:var(--target);font-size:12px}
+.sw i{flex:none;width:44px;border:1px solid var(--line)}
+.sw b{display:block;font-weight:400;color:var(--ink)}
+.sw span{display:block;color:var(--muted);font-size:11px}
+.sg-photo{width:100%;min-width:0;max-width:520px;aspect-ratio:3/2;background:linear-gradient(180deg,#2b2d6e,#d9604a 55%,#f6b45a);border-radius:2px}
+.sg-stack{display:flex;flex-direction:column;gap:var(--s2);max-width:360px}
+.sg-stack .toast,.sg-stack .menu{position:static;transform:none;display:flex;max-width:100%;animation:none}
+.sg-crop{position:relative;width:240px;height:160px;background:linear-gradient(135deg,#355c7d,#c06c84);border-radius:2px;overflow:hidden}
+.sg-crop .crop-box{inset:24px 40px;cursor:default}
+.sg-crop .crop-box .crop-grid{display:block}
+.type-row{display:flex;align-items:baseline;gap:var(--s4);flex-wrap:wrap}
+.type-row small{flex:0 0 120px;color:var(--muted);font-size:11px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 8.5V3h5.5M15.5 3H21v5.5M21 15.5V21h-5.5M8.5 21H3v-5.5" stroke="var(--accent)" stroke-width="2.25" stroke-linecap="square"/><rect class="logo-cursor" x="9.75" y="7.5" width="4.5" height="9" fill="var(--ink)"/></svg>
+    nomi
+  </div>
+  <span class="crumb">styleguide</span>
+</header>
+
+<main class="view sg">
+  <header class="page-head">
+    <div class="page-titles">
+      <h1 class="title">styleguide</h1>
+      <p class="sub">every token and component, rendered from styles.css</p>
+    </div>
+  </header>
+
+  <section id="color">
+    <h2>color</h2>
+    <p class="note">one terminal background, one orange accent. photos are the only other saturated color. every value lives in :root.</p>
+    <div class="sw-grid">
+      <div class="sw"><i style="background:var(--bg)"></i><div><b>--bg</b><span>#292c33 · app, stage, bars</span></div></div>
+      <div class="sw"><i style="background:var(--bg-2)"></i><div><b>--bg-2</b><span>#373737 · hover, selected, toast</span></div></div>
+      <div class="sw"><i style="background:var(--ink)"></i><div><b>--ink</b><span>#ffffff · text</span></div></div>
+      <div class="sw"><i style="background:var(--muted)"></i><div><b>--muted</b><span>#999999 · meta, hints</span></div></div>
+      <div class="sw"><i style="background:var(--rule)"></i><div><b>--rule</b><span>#888888 · prompt hairlines</span></div></div>
+      <div class="sw"><i style="background:var(--accent)"></i><div><b>--accent</b><span>#f19e4b · primary, changed</span></div></div>
+      <div class="sw"><i style="background:var(--accent-2)"></i><div><b>--accent-2</b><span>#f4ba73 · accent hover</span></div></div>
+      <div class="sw"><i style="background:var(--mode)"></i><div><b>--mode</b><span>#f7ce46 · active tab, select, warning</span></div></div>
+      <div class="sw"><i style="background:var(--code)"></i><div><b>--code</b><span>#a4cbfa · filenames</span></div></div>
+      <div class="sw"><i style="background:var(--danger)"></i><div><b>--danger</b><span>#ff6b80 · destructive, errors</span></div></div>
+      <div class="sw"><i style="background:var(--hover)"></i><div><b>--hover</b><span>white 6% · row hover on --bg-2</span></div></div>
+      <div class="sw"><i style="background:var(--track)"></i><div><b>--track</b><span>white 14% · slider track</span></div></div>
+    </div>
+  </section>
+
+  <section id="type">
+    <h2>type</h2>
+    <p class="note">JetBrains Mono only. 400 body, 500 brand word, 700 titles. no uppercase, no tracking, tabular numbers.</p>
+    <div class="type-row"><small>22 / 700 title</small><span style="font-size:22px;font-weight:700">Golden hour, Lisbon</span></div>
+    <div class="type-row"><small>14 / 400 body</small><span>Brilliance +24 · Contrast −8</span></div>
+    <div class="type-row"><small>13 toast</small><span style="font-size:13px">export ready · 12 photos</span></div>
+    <div class="type-row"><small>12 label</small><span style="font-size:12px">straighten 3.5°</span></div>
+    <div class="type-row"><small>11 caption</small><span style="font-size:11px;color:var(--muted)">12 photos · 3 edited</span></div>
+    <div class="type-row"><small>filename</small><span style="font-size:12px;color:var(--code)">IMG_2041.heic</span></div>
+  </section>
+
+  <section id="glyphs">
+    <h2>glyphs</h2>
+    <p class="note">transcript glyphs do the structural work that panels and borders do elsewhere.</p>
+    <div class="empty" style="padding:0">
+      <p class="t-line"><span class="dot" aria-hidden="true">●</span> white bullet: headings</p>
+      <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> elbow: meta lines hanging off a heading</p>
+      <p class="t-prompt"><span class="chev" aria-hidden="true">❯</span> chevron: prompt and selection <span class="cursor" aria-hidden="true"></span></p>
+    </div>
+    <div class="row">
+      <svg class="brand-mark" style="width:48px;height:48px" viewBox="0 0 24 24" fill="none" role="img" aria-label="nomi logo"><path d="M3 8.5V3h5.5M15.5 3H21v5.5M21 15.5V21h-5.5M8.5 21H3v-5.5" stroke="var(--accent)" stroke-width="2.25" stroke-linecap="square"/><rect x="9.75" y="7.5" width="4.5" height="9" fill="var(--ink)"/></svg>
+      <span class="note" style="padding:0">logo: crop brackets in accent around a white block cursor. blinks only in the top bar.</span>
+    </div>
+  </section>
+
+  <section id="buttons">
+    <h2>buttons</h2>
+    <p class="note">terminal text, not boxes. one primary per view.</p>
+    <div class="row">
+      <button class="btn primary">New album</button>
+      <button class="btn ghost">open folder</button>
+      <button class="btn ghost danger">delete</button>
+      <button class="btn ghost" disabled>disabled</button>
+      <label class="btn primary file-btn">Import photos<input type="file" aria-label="Import photos" /></label>
+    </div>
+  </section>
+
+  <section id="selection">
+    <h2>selection</h2>
+    <p class="note">the chosen row gets ❯ and white text; the others reserve the same width with an invisible ❯. editor tabs use --mode; chips use --accent.</p>
+    <div class="tabs" role="tablist" aria-label="Tabs specimen">
+      <button class="tab active" role="tab" aria-selected="true">adjust</button>
+      <button class="tab" role="tab" aria-selected="false">filters</button>
+      <button class="tab" role="tab" aria-selected="false">crop</button>
+      <button class="tab" role="tab" aria-selected="false">text</button>
+    </div>
+    <div class="chips" role="group" aria-label="Chips specimen">
+      <button class="chip">Free</button><button class="chip active">Original</button><button class="chip">Square</button><button class="chip">4:3</button><button class="chip">16:9</button>
+    </div>
+  </section>
+
+  <section id="prompt">
+    <h2>prompt box</h2>
+    <p class="note">full-width --rule hairlines with ❯ and a block cursor or caret.</p>
+    <div id="dropHint" class="drop" role="button" tabindex="0"><span class="chev" aria-hidden="true">❯</span> <span class="long">drop images anywhere · or click to browse</span><span class="short">tap to add photos</span><span class="cursor" aria-hidden="true"></span></div>
+    <div class="prompt-line" style="border-top-color:var(--rule);border-bottom-color:var(--rule)"><span class="chev">❯</span><input class="album-name" value="Golden hour, Lisbon" aria-label="Album name specimen" /></div>
+    <div class="tx-input"><textarea rows="2" aria-label="Text box specimen" placeholder="type something"></textarea></div>
+  </section>
+
+  <section id="sliders">
+    <h2>sliders</h2>
+    <p class="note">2px track, accent fill from the default to the value, block-cursor thumb. changed rows turn the value accent.</p>
+    <div class="adjust-list" style="max-width:360px">
+      <label class="slider"><span><i>Exposure</i> <b>0</b></span><input type="range" min="-100" max="100" value="0" aria-label="Exposure" /></label>
+      <label class="slider changed"><span><i>Brilliance</i> <b>+40</b></span><input type="range" min="-100" max="100" value="40" style="--lo:50%;--hi:70%" aria-label="Brilliance" /></label>
+      <label class="slider changed"><span><i>Warmth</i> <b>−25</b></span><input type="range" min="-100" max="100" value="-25" style="--lo:37.5%;--hi:50%" aria-label="Warmth" /></label>
+    </div>
+  </section>
+
+  <section id="feedback">
+    <h2>feedback</h2>
+    <p class="note">toast (status), busy toast with braille spinner, inline action, export menu. never confirm() or alert().</p>
+    <div class="sg-stack">
+      <div class="toast">album saved</div>
+      <div class="toast busy"><span class="spin">⠹</span>zipping 8 of 24 photos…</div>
+      <div class="toast">deleted 3 photos<button class="toast-action">undo</button></div>
+      <div class="menu" role="menu" aria-label="Export menu specimen">
+        <div class="menu-title">export</div>
+        <button class="menu-item active" role="menuitem"><span class="mi-label">save to folder</span><span class="mi-hint">originals backed up in .nomi-originals</span></button>
+        <button class="menu-item" role="menuitem"><span class="mi-label">download zip</span><span class="mi-hint">full-res copies · originals untouched</span></button>
+        <button class="menu-item" role="menuitem" aria-disabled="true"><span class="mi-label">save to cloud</span><span class="mi-hint">not available in this browser</span></button>
+      </div>
+    </div>
+    <aside class="notice" role="note">
+      <p class="t-line"><span class="warn" aria-hidden="true">●</span> heads up: everything lives in this tab's memory</p>
+      <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> reloading or closing the tab loses all albums and edits. export before you leave.</p>
+    </aside>
+  </section>
+
+  <section id="albums">
+    <h2>albums and photos</h2>
+    <div class="album-grid" style="max-width:520px">
+      <div class="album-card"><div class="thumbs"><div class="sg-photo" style="flex:1;aspect-ratio:3/2"></div><div class="sg-photo" style="flex:1;aspect-ratio:2/3;background:linear-gradient(180deg,#9fc4b2,#2f5a3a)"></div></div><h3>Golden hour, Lisbon</h3><div class="meta">12 photos · 3 edited</div></div>
+      <div class="album-card"><div class="thumbs"><div class="sg-photo" style="flex:1;aspect-ratio:16/9;background:linear-gradient(180deg,#0d0f2b,#c4527d)"></div></div><h3>Night walks</h3><div class="meta">4 photos</div></div>
+    </div>
+    <div class="photo-grid" style="max-width:520px">
+      <div class="photo-row">
+        <div class="photo-card edited" style="width:260px;height:173px"><div class="sg-photo" style="height:100%"></div><span class="nm">IMG_2041.jpg</span><span class="card-actions"><button class="dup">⧉ duplicate</button><button class="del" aria-label="Delete">✕</button></span></div>
+        <div class="photo-card" style="width:258px;height:173px"><div class="sg-photo" style="height:100%;background:linear-gradient(180deg,#6fa9d6,#b9824d)"></div></div>
+      </div>
+    </div>
+    <div class="select-bar" style="position:static"><span class="chev">❯</span><span class="sel-count">2 selected</span><button class="btn ghost">select all</button><button class="btn primary">export selected</button><button class="btn ghost danger">delete</button><button class="btn ghost">cancel</button></div>
+  </section>
+
+  <section id="editor">
+    <h2>editor controls</h2>
+    <p class="note">filter tile, crop overlay with L-brackets, rail group titles.</p>
+    <div class="row" style="align-items:flex-start;gap:var(--s5)">
+      <div class="filter-row" style="width:300px">
+        <button class="filter active"><span class="filter-thumb" style="background:linear-gradient(135deg,#355c7d,#c06c84)"></span><span class="filter-name">Vivid</span></button>
+        <button class="filter"><span class="filter-thumb" style="background:linear-gradient(135deg,#444,#bbb)"></span><span class="filter-name">Mono</span></button>
+        <button class="filter"><span class="filter-thumb" style="background:linear-gradient(135deg,#6b5b45,#e0c9a0)"></span><span class="filter-name">Warm</span></button>
+      </div>
+      <div class="sg-crop"><div class="crop-box"><span class="crop-grid"></span><span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span><span class="h t"></span><span class="h r"></span><span class="h b"></span><span class="h l"></span></div></div>
+      <div class="group" style="width:260px"><div class="group-title">aspect</div><div class="chips"><button class="chip active">Free</button><button class="chip">Square</button></div><div class="group-title">rotate</div><p class="hint">drag the box, its corners or its sides · it settles to fill the view</p></div>
+    </div>
+  </section>
+
+  <section id="motion">
+    <h2>motion</h2>
+    <p class="note">one curve, three durations. opacity and transform only; reduced motion turns it all off.</p>
+    <div class="sw-grid">
+      <div class="sw"><div><b>--ease-out</b><span>cubic-bezier(.2,.8,.2,1)</span></div></div>
+      <div class="sw"><div><b>--dur-fast</b><span>.12s · hover, press, small changes</span></div></div>
+      <div class="sw"><div><b>--dur-med</b><span>.16s · view enter, panels, menu, toast</span></div></div>
+      <div class="sw"><div><b>--dur-slow</b><span>.38s · crop settle</span></div></div>
+    </div>
+  </section>
+
+  <section id="empty">
+    <h2>empty state</h2>
+    <div class="empty" style="padding:0">
+      <p class="t-line"><span class="dot" aria-hidden="true">●</span> no albums yet</p>
+      <p class="t-sub"><span class="elbow" aria-hidden="true">⎿</span> create one to start. everything vanishes on reload.</p>
+      <p class="t-prompt"><span class="chev" aria-hidden="true">❯</span> <span class="cursor" aria-hidden="true"></span></p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

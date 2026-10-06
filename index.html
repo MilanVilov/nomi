@@ -58,7 +58,7 @@
       <button id="btnBackAlbums" class="btn ghost">‹ albums</button>
     </div>
   </header>
-  <div id="dropHint" class="drop" role="button" tabindex="0"><span class="chev" aria-hidden="true">❯</span> drop images anywhere · or click to browse<span class="cursor" aria-hidden="true"></span></div>
+  <div id="dropHint" class="drop" role="button" tabindex="0"><span class="chev" aria-hidden="true">❯</span> <span class="long">drop images anywhere · or click to browse</span><span class="short">tap to add photos</span><span class="cursor" aria-hidden="true"></span></div>
   <div id="selectBar" class="select-bar hidden" role="toolbar" aria-label="Selection">
     <span class="chev" aria-hidden="true">❯</span>
     <span id="selCount" class="sel-count">0 selected</span>
@@ -76,6 +76,7 @@
     <div class="ed-history">
       <button id="btnUndo" class="btn ghost" aria-label="Undo" title="Undo (⌘Z)" disabled>↶</button>
       <button id="btnRedo" class="btn ghost" aria-label="Redo" title="Redo (⇧⌘Z)" disabled>↷</button>
+      <button id="btnCompare" class="btn ghost compare" aria-pressed="false" aria-label="Show original" title="Original / edited (\)"><span class="cmp-glyph" aria-hidden="true">◐</span><span class="cmp-label">original</span></button>
     </div>
     <div id="edName" class="ed-name">photo.jpg</div>
     <div class="actions ed-actions">
@@ -85,6 +86,7 @@
     </div>
   </div>
   <section class="stage" aria-label="Photo stage">
+    <div class="orig-badge" aria-hidden="true">original</div>
     <button id="btnPrev" class="nav-arrow prev" type="button" aria-label="Previous photo" title="Previous (←)">‹</button>
     <button id="btnNext" class="nav-arrow next" type="button" aria-label="Next photo" title="Next (→)">›</button>
     <div id="stageWrap" class="stage-wrap">
@@ -92,6 +94,7 @@
       <div id="cropLayer" class="crop-layer hidden">
         <div id="cropBox" class="crop-box">
           <span class="h tl"></span><span class="h tr"></span><span class="h bl"></span><span class="h br"></span>
+          <span class="h t"></span><span class="h r"></span><span class="h b"></span><span class="h l"></span>
         </div>
       </div>
       <div id="textLayer" class="text-layer hidden" aria-label="Text layers on the photo"></div>
@@ -118,7 +121,7 @@
           <input id="inStraighten" type="range" min="-45" max="45" step="0.5" value="0" aria-label="Straighten" />
         </label>
       </div>
-      <p class="hint">drag the box or its corners · it settles to fill the view · ⌘Z to undo</p>
+      <p class="hint">drag the box, its corners or its sides · it settles to fill the view · ⌘Z to undo</p>
     </div>
     <div id="panelText" class="text-panel hidden" role="tabpanel" aria-label="Text"></div>
     <div id="filmstrip" class="filmstrip" aria-label="Photos in album"></div>

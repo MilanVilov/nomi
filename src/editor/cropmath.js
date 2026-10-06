@@ -88,6 +88,34 @@ export function resizeFromCorner(start, corner, dx, dy, lockRatio, dispAspect, m
   return { x: left ? ax - w : ax, y: top ? ay - h : ay, w, h };
 }
 
+// edge: 't'|'r'|'b'|'l'. Opposite side is the anchor. Free: only that axis changes.
+// Locked: the dragged side moves and the other axis grows/shrinks around the box centre.
+export function resizeFromEdge(start, edge, dx, dy, lockRatio, dispAspect, min = 0.05) {
+  const horiz = edge === 't' || edge === 'b'; // a horizontal side: height changes
+  const neg = edge === 't' || edge === 'l';   // dragged side is the near (top/left) one
+  const k = lockRatio > 0 ? lockRatio / (dispAspect > 0 ? dispAspect : 1) : 0; // normalized w/h
+  const pos = horiz ? start.y : start.x, size = horiz ? start.h : start.w;
+  const anchor = neg ? pos + size : pos;
+  const delta = horiz ? dy : dx;
+  let n = size + (neg ? -delta : delta);
+  let hi = neg ? anchor : 1 - anchor;
+  let lo = min;
+  if (k > 0) {
+    const cross = horiz ? start.x + start.w / 2 : start.y + start.h / 2;
+    const crossMax = 2 * Math.min(cross, 1 - cross); // widest symmetric span inside the image
+    hi = Math.min(hi, horiz ? crossMax / k : crossMax * k);
+    lo = horiz ? Math.max(min, min / k) : Math.max(min, min * k);
+  }
+  n = clamp(n, Math.min(lo, hi), hi);
+  const p0 = neg ? anchor - n : anchor;
+  if (k > 0) {
+    const cross = horiz ? start.x + start.w / 2 : start.y + start.h / 2;
+    const m = horiz ? n * k : n / k;
+    return horiz ? { x: cross - m / 2, y: p0, w: m, h: n } : { x: p0, y: cross - m / 2, w: n, h: m };
+  }
+  return horiz ? { x: start.x, y: p0, w: start.w, h: n } : { x: p0, y: start.y, w: n, h: start.h };
+}
+
 // Pixel size of the rotated crop, longest edge capped at maxEdge (never upscaled).
 export function outputSize(imgW, imgH, crop, steps, maxEdge) {
   let cw = Math.max(1, Math.round(imgW * crop.w));

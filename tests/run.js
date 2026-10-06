@@ -131,6 +131,42 @@ function crc32Bytes(bytes, table) {
   const fr3 = cm.resizeFromCorner(s0, 'tr', 3, -3, 0, 1.5);
   ok(near(fr3.x, 0.2) && near(fr3.w, 0.8) && near(fr3.y, 0) && near(fr3.h, 0.6), 'cropmath free big drag clamps to bounds', J(fr3));
 
+  // resizeFromEdge
+  const eb = { x: 0.2, y: 0.3, w: 0.4, h: 0.3 };
+  const e1 = cm.resizeFromEdge(eb, 't', 0, -0.1, 0, 1.5);
+  ok(near(e1.y, 0.2) && near(e1.h, 0.4) && near(e1.x, 0.2) && near(e1.w, 0.4), 'cropmath edge t free changes only top', J(e1));
+  const e2 = cm.resizeFromEdge(eb, 'b', 0.3, 0.1, 0, 1.5);
+  ok(near(e2.y, 0.3) && near(e2.h, 0.4) && near(e2.x, 0.2) && near(e2.w, 0.4), 'cropmath edge b free changes only bottom (ignores dx)', J(e2));
+  const e3 = cm.resizeFromEdge(eb, 'l', -0.1, 0.3, 0, 1.5);
+  ok(near(e3.x, 0.1) && near(e3.w, 0.5) && near(e3.y, 0.3) && near(e3.h, 0.3), 'cropmath edge l free changes only left', J(e3));
+  const e4 = cm.resizeFromEdge(eb, 'r', 0.1, 0.3, 0, 1.5);
+  ok(near(e4.x, 0.2) && near(e4.w, 0.5) && near(e4.y, 0.3) && near(e4.h, 0.3), 'cropmath edge r free changes only right', J(e4));
+  const e5 = cm.resizeFromEdge(eb, 't', 0, -5, 0, 1.5), e6 = cm.resizeFromEdge(eb, 'b', 0, 5, 0, 1.5);
+  const e7 = cm.resizeFromEdge(eb, 'l', -5, 0, 0, 1.5), e8 = cm.resizeFromEdge(eb, 'r', 5, 0, 0, 1.5);
+  ok(near(e5.y, 0) && near(e5.h, 0.6) && near(e6.y, 0.3) && near(e6.h, 0.7) && near(e7.x, 0) && near(e7.w, 0.6) && near(e8.x, 0.2) && near(e8.w, 0.8),
+    'cropmath edge free clamps at image bounds', J([e5, e6, e7, e8]));
+  const e9 = cm.resizeFromEdge(eb, 't', 0, 5, 0, 1.5), e10 = cm.resizeFromEdge(eb, 'r', -5, 0, 0, 1.5);
+  ok(near(e9.h, 0.05) && near(e9.y, 0.55) && near(e10.w, 0.05) && near(e10.x, 0.2), 'cropmath edge free stops at min size keeping the anchor', J([e9, e10]));
+  let edgeOk = true, edgeMsg = '';
+  for (const [ratio, dA] of [[1, 1.5], [16 / 9, 1.5], [1.5, 1.5], [1, 0.75]]) {
+    const k = ratio / dA;
+    const sb = cm.centeredAspectRect(ratio, dA);
+    const sm = { x: 0.3, y: 0.3, w: 0.3 * 1, h: 0.3 / k }; // off-centre box with the lock's ratio
+    for (const st of [sb, sm]) for (const edge of ['t', 'r', 'b', 'l']) for (const [dx, dy] of [[0.1, 0.1], [-0.1, -0.1], [5, 5], [-5, -5], [0.02, -0.3]]) {
+      if (!inside(st)) continue;
+      const r = cm.resizeFromEdge(st, edge, dx, dy, ratio, dA);
+      const horiz = edge === 't' || edge === 'b';
+      const sc = horiz ? st.x + st.w / 2 : st.y + st.h / 2, rc = horiz ? r.x + r.w / 2 : r.y + r.h / 2;
+      const anch = { t: [r.y + r.h, st.y + st.h], b: [r.y, st.y], l: [r.x + r.w, st.x + st.w], r: [r.x, st.x] }[edge];
+      if (!(near(r.w / r.h, k, 1e-9) && inside(r) && r.w >= 0.05 - E && r.h >= 0.05 - E && near(sc, rc, 1e-9) && near(anch[0], anch[1], 1e-9))) {
+        edgeOk = false; edgeMsg = `${ratio} ${edge} ${dx},${dy} ${J(r)}`;
+      }
+    }
+  }
+  ok(edgeOk, 'cropmath edge locked (1:1, 16:9, original, portrait) keeps ratio, anchor and centre, inside bounds, >= min', edgeMsg);
+  const eq = cm.resizeFromEdge(cm.centeredAspectRect(1, 1.5), 'r', 0.05, 0, 1, 1.5);
+  ok(near(eq.w * 1.5 / eq.h, 1) && near(eq.y + eq.h / 2, 0.5) && eq.h < 1 + E, 'cropmath edge r locked 1:1 grows w, h follows around centre', J(eq));
+
   let mvOk = true;
   for (const [dx, dy] of [[1, 1], [-1, -1], [0.3, -0.9], [-0.05, 0.1]]) {
     const m = cm.moveRect(s0, dx, dy);
@@ -183,6 +219,33 @@ function crc32Bytes(bytes, table) {
     ok(cp.name === 'x copy.png' && cp.params.exposure === 30, 'duplicatePhoto keeps edits, renames');
     cp.params.exposure = 0; cp.params.crop.w = 0.5;
     ok(st.state.photos.get('p1').params.exposure === 30 && st.state.photos.get('p1').params.crop.w === 1, 'duplicate params are independent (deep copy)');
+  }
+  // needsSave / paramsSig: what "save to folder" has to write
+  {
+    const st = await import(storeUrl);
+    const dir = {};
+    const mk = (o = {}) => ({ dir, handle: {}, params: st.defaultParams(), ...o });
+    ok(st.needsSave(mk()) === false, 'needsSave: untouched folder photo is not written');
+    ok(st.needsSave({ params: st.defaultParams(), handle: {} }) === false && st.needsSave({ params: st.defaultParams(), handle: {}, savedParams: {} }) === false, 'needsSave: photo without a folder never');
+    const e = mk(); e.params.exposure = 20;
+    ok(st.needsSave(e) === true, 'needsSave: edited, never saved');
+    e.savedParams = structuredClone(e.params);
+    ok(st.needsSave(e) === false && st.isEdited(e) === true, 'needsSave: saved edit is clean but still edited');
+    e.params.texts.push({ text: 'hi' });
+    ok(st.needsSave(e) === true, 'needsSave: changed after save');
+    e.savedParams = structuredClone(e.params);
+    e.params = JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(e.params).reverse())));
+    ok(st.needsSave(e) === false, 'needsSave: key order does not matter');
+    Object.assign(e.params, st.defaultParams());
+    ok(st.needsSave(e) === true, 'needsSave: reset after save must be written back');
+    ok(st.needsSave(mk({ handle: undefined })) === true, 'needsSave: copy without file always');
+    const orig = mk({ savedParams: {}, createdHere: true });
+    orig.params.exposure = 5;
+    st.state.albums.set('al_s', { id: 'al_s', name: 's', photoIds: [] });
+    st.state.photos.set('s1', { id: 's1', albumId: 'al_s', name: 'z.jpg', ...orig });
+    st.state.albums.get('al_s').photoIds.push('s1');
+    const c2 = st.duplicatePhoto('s1');
+    ok(!c2.handle && !c2.savedParams && !c2.createdHere && st.needsSave(c2), 'duplicate of a saved photo is a new, unsaved file');
   }
 
   // 7. filters (iOS Photos set)
@@ -253,6 +316,35 @@ function crc32Bytes(bytes, table) {
     const noOri = new Uint8Array(buildApp1(true)); noOri[10 + 8 + 2 + 12] = 0x13; // retag Orientation entry
     ok(eq(ex.setOrientation1(noOri), noOri), 'setOrientation1 without Orientation returns unchanged copy');
     ok(eq(ex.setOrientation1(new Uint8Array([1, 2, 3])), [1, 2, 3]), 'setOrientation1 malformed returns copy, no throw');
+
+    // Edits must not leave the original's preview thumbnail or pixel size behind.
+    {
+      const le32 = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, v >>> 24];
+      const le16 = (v) => [v & 255, v >> 8];
+      const ent = (tag, type, v) => [...le16(tag), ...le16(type), ...le32(1), ...le32(v)];
+      const thumb = [0xFF, 0xD8, 0xFF, 0xDB, 0x00, 0x03, 0x00, 0xFF, 0xD9];
+      const tiff = [0x49, 0x49, 42, 0, 8, 0, 0, 0,
+        ...le16(2), ...ent(0x0112, 3, 6), ...ent(0x8769, 4, 38), ...le32(68),
+        ...le16(2), ...ent(0xA002, 4, 4000), ...ent(0xA003, 4, 3000), ...le32(0),
+        ...le16(2), ...ent(0x0201, 4, 98), ...ent(0x0202, 4, thumb.length), ...le32(0),
+        ...thumb];
+      const payload = [...ascii('Exif\0\0'), ...tiff];
+      const app1 = new Uint8Array([0xFF, 0xE1, (payload.length + 2) >> 8, (payload.length + 2) & 255, ...payload]);
+      const r = ex.refreshForEdit(app1, { width: 1234, height: 987 });
+      const rd32 = (a, o) => (a[o] | (a[o + 1] << 8) | (a[o + 2] << 16) | (a[o + 3] << 24)) >>> 0;
+      ok(r.length === app1.length - thumb.length && ((r[2] << 8) | r[3]) === r.length - 2, 'refreshForEdit cuts a tail-aligned thumbnail and fixes the segment length');
+      ok(rd32(r, 10 + 8 + 2 + 24) === 0, 'refreshForEdit clears the IFD0 -> IFD1 link');
+      ok(rd32(r, 10 + 38 + 2 + 8) === 1234 && rd32(r, 10 + 38 + 2 + 12 + 8) === 987, 'refreshForEdit writes the new PixelX/YDimension');
+      ok(eq(app1.slice(0, 4), [0xFF, 0xE1, app1[2], app1[3]]) && app1.length === payload.length + 4, 'refreshForEdit does not mutate input');
+      const bare = jpeg(DQT);
+      const sof = new Uint8Array([0xFF, 0xD8, 0xFF, 0xC0, 0, 11, 8, 0x03, 0xDB, 0x04, 0xD2, 1, 1, 0x11, 0, 0xFF, 0xD9]);
+      const sz = ex.jpegSize(sof);
+      ok(sz && sz.width === 1234 && sz.height === 987, 'jpegSize reads SOF dimensions', JSON.stringify(sz));
+      const whole = ex.copyExif(jpeg(APP0, [...app1], DQT), new Uint8Array([...sof.slice(0, 2), ...[0xFF, 0xDB, 0x00, 0x05, 0x00, 0x11, 0x22], ...sof.slice(2)]));
+      const got = ex.extractApp1(whole);
+      ok(got && got.length === app1.length - thumb.length && rd32(got, 10 + 8 + 2 + 24) === 0, 'copyExif drops the thumbnail end to end');
+      ok(ex.refreshForEdit(new Uint8Array([1, 2, 3]), { width: 1, height: 1 }).length === 3, 'refreshForEdit malformed returns copy, no throw');
+    }
 
     const xmp = [...ascii('http://ns.adobe.com/xap/1.0/\0'), ...ascii('<x/>')];
     const xmpSeg = [0xFF, 0xE1, (xmp.length + 2) >> 8, (xmp.length + 2) & 255, ...xmp];

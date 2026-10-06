@@ -1,93 +1,73 @@
 ---
 name: nomi-design
-description: Claude Code × Ghostty design system for Nomi (JetBrains Mono, terminal colors, glyphs as structure, selection chevrons, block cursors, photo-first editor). Use it whenever you touch index.html or styles.css, or add any UI markup or CSS.
+description: nomi's design language, "Claude Code running in Ghostty" (JetBrains Mono, terminal colors, glyphs as structure, one orange accent, photo-first editor). Load this BEFORE building or changing any nomi UI, including index.html, styles.css, new views, buttons, menus, toasts, sliders, empty/error/busy states, microcopy, the logo, README or demo visuals, and screenshots. Also load it when reviewing UI, or when someone mentions colors, fonts, spacing, "make it look nicer", the styleguide or the brand.
 ---
 
-# nomi-design
+# nomi design language
 
-Nomi looks like Claude Code running in Ghostty: one terminal background, monospace text, one orange accent, and transcript glyphs doing the structural work that panels and borders would do elsewhere. The photos are the only other saturated color on screen.
+nomi should feel like Claude Code running in Ghostty: one terminal background, monospace text, one orange accent, and transcript glyphs (`●` `⎿` `❯` `█`) doing the structural work that panels and borders do elsewhere. The user's photos are the heroes and the only other saturated color on screen. Everything else stays quiet and text-shaped.
 
-## Tokens (in `:root` only; never hardcode colors elsewhere)
-Sampled from the user's Ghostty + Claude Code window:
-- `--bg:#292c33` terminal background; the whole app, including stage and top bars.
-- `--bg-2:#373737` the bar behind the user's own message. Use it for hover/selected rows, the toast, the active chip and the focused album-name input.
-- `--ink:#ffffff` text · `--muted:#999999` secondary lines ("Searched for 1 pattern…") and hints.
-- `--rule:#888888` the full-width hairline around the prompt box (top bars, prompt boxes).
-- `--line:rgba(255,255,255,.10)` subtle divider, only if truly needed · `--track:rgba(255,255,255,.14)` slider track.
-- `--accent:#f19e4b` the Claude Code spinner star (sampled color only; never use that glyph) · `--accent-2:#f4ba73` spinner/shimmer text, used for hover on accent items.
-- `--mode:#f7ce46` the "⏵⏵ auto mode on" line. Use it ONLY for the active editor tab's `❯`.
-- `--scrim` photo-name gradient. Crop overlay: `--crop-dim` `--crop-edge` `--crop-grid` `--white` (unchanged).
-- Spacing `--s1..--s6` = 4/8/12/16/24/32 · `--bar:52px` · `--target:44px`.
-- `--code:#a4cbfa` paths / inline code in the terminal → photo filenames (`#edName`, gallery `.nm`) only.
-- `theme-color #292c33`; favicon is `assets/favicon.svg` (the logo on a `#292c33` square).
+**Living reference:** `styleguide.html` renders every token and component from the real `styles.css`. **Tokens:** `:root` in `styles.css`. **Screenshots:** `node scripts/screenshots.mjs` (see `references/layout-and-motion.md`).
 
-## Font and type
-- `--font:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace` (Ghostty's default), loaded from Google Fonts at 400/500/700 with preconnects.
-- 14 base · 12 labels · 11 captions · 13 toast · 22 titles. Line-height 1.4.
-- No bold except titles (700); the brand word is 500. No uppercase, no letter-spacing. Numbers use `tabular-nums`.
+## Six principles
 
-## Glyph vocabulary (sparing and consistent)
-- **Logo** (`assets/logo.svg`, inlined in `.brand`): four accent crop L-brackets (the crop tool's handles) framing a white block cursor. Stroke 2.25 on a 24 grid, square caps, no radius. The cursor blinks in the topbar only. Never use the Anthropic/Claude ✻ spark.
-- `●` white: before primary headings (page title, album tile names, empty-state first line). Muted `●` for rail group titles (`● aspect`, `● rotate`). Accent `●` before toast text.
-- `⎿` muted: before secondary/meta lines (`#albumMeta`, the albums subline, the empty-state second line).
-- `❯`: the prompt and selection chevron.
-- Block cursor: `<span class="cursor">`, 8×16 `--ink`, `blink 1s steps(1) infinite`. Only at the end of a prompt line.
-- When the text comes from JS, draw glyphs with `::before` so JS keeps setting plain text. Use `white-space:pre` on the pseudo so the trailing space survives.
+1. **The photo is the hero.** Color comes from photographs. The chrome uses only `--bg`, `--bg-2`, `--ink`, `--muted`, `--rule` and the accent family. The editor always shows the whole photo, letterboxed, never CSS-stretched.
+2. **Text is the interface.** Buttons are words, selection is a `❯`, headings are a `●`, meta lines hang off `⎿`. No panels, cards, pills, shadows or icon libraries.
+3. **One accent, used sparingly.** `--accent` orange means "primary, changed, selected". `--mode` yellow appears only on the active editor tab chevron, the select-mode chevron, the busy-warning bullet and the active compare toggle. `--danger` is only for destructive hover and error reasons.
+4. **Quiet until it matters.** One `[ primary ]` per view. Everything else is muted text that lights up on hover.
+5. **Honest and local.** Nothing leaves the tab, and the UI says so plainly. Tell users what is kept in memory and what is lost on reload (see `references/voice-and-copy.md`).
+6. **Zero dependencies.** One font (JetBrains Mono, 3 weights), plain CSS, no UI library, no build step. Every id that JS uses exists in the HTML.
 
-## Selection = the chevron
-- A chosen row gets `❯ ` and white text; the others are muted with an invisible `❯ ` (`color:transparent`) of the same width, so nothing shifts. No underlines.
-- Editor tabs (`adjust` / `crop`): active chevron in `--mode`.
-- Aspect `.chip`s: borderless text; active chevron in accent + `--bg-2` background; hover `--bg-2`.
-- `.album-card`: hover turns the name accent (bullet stays white).
+## Core rules (non-negotiable)
 
-## Buttons are terminal text, not boxes
-- `.btn`: transparent, muted, no border, radius 0, min-height 44; hover `--bg-2` + ink.
-- `.btn.primary`: accent text wrapped in `::before "[ "` / `::after " ]"` → `[ Done ]`, `[ New album ]`, `[ Import photos ]`. Hover `--bg-2` + `--accent-2`.
-- `#btnDownloadAlbum` reads `↓ album.zip`; `#btnDuplicate` and Reset are plain `.btn`.
-- Focus: `:focus-visible` 1px accent outline, offset 2.
+- **Tokens only.** Every color is a `:root` token. No hex or rgba outside `:root` and the Text tool's user-pickable colors. If you need a new shade, add a token and document it in `references/tokens.md` and `styleguide.html`.
+- **Type:** JetBrains Mono everywhere. Weights 400 body, 500 brand word, 700 titles only. Sizes 22 / 14 / 13 / 12 / 11. No uppercase, no letter-spacing. Numbers use `tabular-nums`.
+- **Shape:** radius 0 everywhere except 2px photo thumbs and the round `.edited` dot. No box shadows except the crop dim.
+- **Lines:** hairlines are `--rule` and only for top bars and prompt boxes. `--line` is a rare soft divider.
+- **Selection is the chevron:** chosen = `❯ ` + white text; others muted with an invisible same-width `❯ ` (`color:transparent`) so nothing shifts. No underlines, no pills.
+- **Targets:** every interactive element is at least 44px tall (`--target`), except the 32px photo-card actions and the 24px color swatch.
+- **Focus:** keep `:focus-visible` 1px `--accent` outline, offset 2px. Never remove it without an equal replacement.
+- **No browser dialogs.** Never `alert()` / `confirm()` / `prompt()`. Use the toast (with an inline action for undo) or the `#exportMenu` list.
+- **Dark only.** There is no light theme (reasoning in `references/tokens.md`). Don't add `prefers-color-scheme` branches.
+- **Lowercase voice.** Status, toasts, meta, tabs and secondary buttons are lowercase. Only primary `[ Buttons ]`, the editor's `Cancel` / `Duplicate` / `Reset` and photo names keep their own casing. See `references/voice-and-copy.md`.
 
-## Prompt box, caret, thumbs
-- The Claude Code input is framed by full-width `--rule` hairlines above and below, with `❯ ` and a block cursor.
-- `#dropHint`: `--rule` top + bottom, `❯ drop images anywhere · or click to browse` muted + `.cursor`; hover makes the text ink. Keep id, `role="button"`, `tabindex`.
-- `#albumName` lives in `.prompt-line` (`.chev` + input), 22px/700 white. Hairlines appear only on `:focus-within`; the focused input gets `--bg-2`.
-- Carets: `input,textarea{caret-color:var(--ink);caret-shape:block}`.
-- Sliders: 2px `--track`, accent fill between `--lo`/`--hi` (JS-set %), thumb is a block cursor (8×16, radius 0, ink; accent on hover/active). Name muted, value ink; `.changed` → value accent, name ink. Rows ≥44px, 16px apart.
-- Toast: `--bg-2` bar, radius 0, ink 13px, accent `●`, bottom-center.
+## Do / don't at a glance
 
-## No panels
-- No bordered cards, shadows (except the crop dim), pills or radii (except 2px thumbs and the round `.edited` dot).
-- Hairlines are `--rule` and only for top bars and prompt boxes.
+| Do | Don't |
+|---|---|
+| `[ Import photos ]` in accent, hover `--bg-2` | A filled orange rounded button |
+| `● albums` / `⎿ session-only · nothing leaves this tab` | A bold H1 with an underline and a gray subtitle |
+| `❯ drop images anywhere` between two `--rule` hairlines | A dashed dropzone box with a cloud icon |
+| Toast: `● deleted 3 photos  undo` | `confirm("Delete 3 photos?")` |
+| Photo name in `--code` blue on a `--scrim` | White labels on a pill |
+| Slider thumb as an 8×16 block cursor | A round knob with a shadow |
+| `⠹ exporting 8/24 · IMG_2041.jpg` (braille spinner) | A spinning SVG or a progress bar |
 
-## Layout
-- `.topbar` 52px, `--rule` bottom: logo + `nomi`, muted `#crumb`, `#btnDownloadAlbum` right. Hidden while the editor is open.
-- Albums view: `● albums` title, `⎿` subline, actions; `.album-grid` tiles with up to 3 real-ratio thumbs. Empty state is a transcript: `● no albums yet` / `  ⎿ create one…` / `❯ █`.
-- Album view: prompt-line title, `⎿` meta, `#dropHint`, then the justified gallery: `.photo-grid` > `.photo-row` > `.photo-card`. JS sets row heights and card widths from each photo's ratio; CSS never sizes them. Overlays: `.nm` ink on `--scrim`, `.dup` `⧉ duplicate` on `--bg-2` (accent hover), `.edited` accent dot.
-- **Import:** `<label class="btn primary file-btn">Import photos<input id="fileInput" type="file" …></label>`; the input is absolute, `inset:0`, `opacity:0`, `font-size:16px`. Never `hidden`, `display:none`, a 1px clip or `for=`.
+## Reference files (read the one you need)
 
-## Editor (photo first)
-- `100dvh` grid: 52px `.ed-top` (Cancel · centered name · Duplicate · Reset · `[ Done ]`), `.stage` 1fr, `.rail` `clamp(280px,28vw,360px)`.
-- **The photo is always letterboxed in full.** JS sizes `#glCanvas` in px; CSS only sets `max-width/max-height:100%; flex:none`.
-- **Fade:** JS sets `--edge-soft`; the rail background is `var(--edge-soft,var(--bg))`; `.stage::after` is a 140px eased gradient to it (z 1). In `.editor.cropping` the stage-wrap pads right 140px and the fade sits above the dim (z 3).
-- Rail: chevron tabs, then sliders or the crop panel (`● aspect` chips, `● rotate`, straighten, 11px muted hint), then `#filmstrip` at `margin-top:auto` (56px, opacity .6, active 2px accent outline).
-- **Crop overlay:** `#cropLayer` absolute z 2 over the canvas; `#cropBox` dims with `0 0 0 9999px var(--crop-dim)` + 1px white outline; `.crop-grid` 3×3 at 35% white; `.h.tl|tr|bl|br` 44×44 hit areas drawing white 3px L-brackets (22×22), `touch-action:none`.
+- `references/tokens.md`: every color, type size, spacing and motion value, with contrast ratios and the reasoning (palette, font, why dark only).
+- `references/components.md`: markup and CSS recipe for every component: glyphs, logo, buttons, tabs, chips, prompt box, sliders, toast, menu, notice, albums, gallery, select bar, filters, crop, text gizmo.
+- `references/layout-and-motion.md`: page skeletons, the editor grid, responsive breakpoints, motion, and how to take and read screenshots.
+- `references/voice-and-copy.md`: tone rules and microcopy for every state (empty, busy, success, error, privacy notices).
+- `references/imagery.md`: how photos are shown (letterbox, justified gallery, thumbs, edge fade), the logo, favicon, and demo assets.
+- `references/share-and-docs.md`: README, meta tags, theme color, social image and demo gif rules.
 
-## Responsive and motion
-- Below 960px: single column, stage 58dvh on top, rail below, fade turns vertical.
-- Below 600px: insets 16, tighter button padding in `.ed-top`, gallery rows target 140px.
-- `prefers-reduced-motion`: no transitions, no cursor blink.
+## Before you ship UI (checklist)
 
-## Checklist
-- [ ] Every color is a `:root` token from the list above; no stray hex.
-- [ ] `--mode` yellow appears only on the active tab chevron.
-- [ ] Whole UI is JetBrains Mono; only titles are bold; no uppercase or tracking.
-- [ ] Glyphs follow the vocabulary: logo (brackets + cursor) as brand, `●` headings, `⎿` meta, `❯` prompt/selection.
-- [ ] Selected rows use the chevron with an invisible same-width prefix on the others.
-- [ ] Buttons are text: default muted, primary `[ … ]` in accent; hover `--bg-2`.
-- [ ] Prompt boxes use `--rule` hairlines top and bottom and a block cursor or block caret.
-- [ ] Slider thumbs are 8×16 blocks; fill between `--lo`/`--hi` is accent.
-- [ ] No panels, shadows (except crop dim) or radii (except 2px thumbs, edited dot).
-- [ ] Spacing is 4/8/12/16/24/32 and every target is ≥44px.
-- [ ] Every DOM id JS uses exists; the import input is a real stretched control.
-- [ ] Canvas never CSS-stretched; fade seamless; crop overlay has dim, grid, L-brackets.
-- [ ] Works at 960 and 600 with no horizontal scroll; reduced motion stops the blink.
-- [ ] Export choices use the `#exportMenu` selection list (`❯` active row, disabled rows show the reason in `--danger`); destructive saves confirm inline via the toast action, never `confirm()`.
+1. [ ] Only `:root` tokens (grep your diff for `#[0-9a-f]{3,6}` and `rgba?\(` outside `:root`).
+2. [ ] You reused an existing class. A new component is added to `styleguide.html` and `references/components.md`.
+3. [ ] One `[ primary ]` in the view, visible without scrolling at 390px.
+4. [ ] Glyphs follow the vocabulary: `●` headings, `⎿` meta, `❯` prompt and selection, block cursor only at the end of a prompt line.
+5. [ ] Selected rows use the chevron with an invisible same-width prefix on the others.
+6. [ ] Copy is lowercase, plain and specific, and follows `voice-and-copy.md`.
+7. [ ] Keyboard: everything reachable, visible focus, logical order. Inputs have `aria-label` or a label. Decorative glyphs have `aria-hidden="true"`.
+8. [ ] Contrast: `--muted` on `--bg` is the lowest allowed text. Don't put `--muted` on `--bg-2` for anything essential.
+9. [ ] 960px and 600px breakpoints work with no horizontal scroll, including the phone editor top bar at 360px.
+10. [ ] Every DOM id used by JS exists; the import input is a real stretched `<input type="file">` (never `hidden`, `display:none` or `for=`).
+11. [ ] Canvas never CSS-stretched; edge fade seamless; crop overlay has dim, grid and L-brackets.
+12. [ ] `prefers-reduced-motion` stops the cursor blink and transitions.
+13. [ ] `node tests/run.js` passes, and `node scripts/screenshots.mjs` shows no `!` warnings and the screenshots look right at 390 and 1440.
+
+## Naming
+
+The name is **nomi**, always lowercase, also at the start of a sentence and in titles. The mark is the crop-bracket logo with a block cursor, never the Anthropic / Claude ✻ spark.

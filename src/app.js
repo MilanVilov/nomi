@@ -1,4 +1,4 @@
-import { state, uid, defaultParams, isEdited, duplicatePhoto, deletePhoto, restorePhoto, isUrlInUse } from './store.js';
+import { state, uid, defaultParams, isEdited, needsSave, duplicatePhoto, deletePhoto, restorePhoto, isUrlInUse } from './store.js';
 import { revokePhoto, looksLikeImage } from './importer.js';
 import { importFiles } from './importer.js';
 import { createEngine } from './editor/gl.js';
@@ -23,7 +23,7 @@ const glCanvas = $('glCanvas'), cropLayer = $('cropLayer'), cropBox = $('cropBox
 const tabAdjust = $('tabAdjust'), tabCrop = $('tabCrop'), panelAdjust = $('panelAdjust'), panelCrop = $('panelCrop');
 const tabFilters = $('tabFilters'), panelFilters = $('panelFilters');
 const tabText = $('tabText'), panelText = $('panelText'), textLayer = $('textLayer');
-const btnUndo = $('btnUndo'), btnRedo = $('btnRedo'), btnPrev = $('btnPrev'), btnNext = $('btnNext');
+const btnCompare = $('btnCompare'), btnUndo = $('btnUndo'), btnRedo = $('btnRedo'), btnPrev = $('btnPrev'), btnNext = $('btnNext');
 const btnOpenFolder = $('btnOpenFolder'), importLabel = fileInput.closest('label'), exportMenu = $('exportMenu'), exportTitle = $('exportTitle');
 const aspectRow = $('aspectRow'), btnRot = $('btnRot'), inStraighten = $('inStraighten'), vStraighten = $('vStraighten');
 const filmstrip = $('filmstrip'), toastEl = $('toast'), btnDuplicate = $('btnDuplicate');
@@ -38,15 +38,23 @@ let previewEngine = null, previewReady = false, tab = 'adjust';
 let history = [], future = [], commitT = 0, pointerDown = false;
 let cropAdjusting = false, settleT = 0, openSeq = 0, navTarget = null;
 let menuIds = null, lastExport = 'folder', saving = false;
-let raf = 0, cropMode = false, snapshot = null, toastT = 0, toastSpin = 0;
+let raf = 0, cropMode = false, showOriginal = false, snapshot = null, toastT = 0, toastSpin = 0;
 let selecting = false, importing = null, exporting = false, galleryRaf = 0;
+let found = null, foundT = 0; // the card you just left the editor from: { id, at }
+const FOUND_MS = 1400;
+const memoryFiles = new WeakSet(); // originals already copied into memory (see doSaveToFolder)
+const heldCopy = new WeakMap(); // original File -> { file, url } of its in-memory copy (for photos restored by undo)
 const selected = new Set();
 const SPIN = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏';
 const curPhoto = () => state.photos.get(state.activePhoto);
 
 // Status bar. busy: stays up with a braille spinner until the next toast.
-// action: { label, run } adds an inline button (e.g. undo).
-function toast(msg, { busy = false, action = null, ms = 2600 } = {}) {
+// action: { label, run } adds an inline button (e.g. undo); extra: more of them, shown after it.
+let toastActions = []; // actions of the toast on screen; their expire() runs when it goes away unused
+function expireToast() { const a = toastActions; toastActions = []; for (const x of a) if (x.expire) x.expire(); }
+
+function toast(msg, { busy = false, action = null, extra = [], ms = 2600 } = {}) {
+  expireToast(); // a toast replaced by another one can no longer be undone: let go of what it held
   clearTimeout(toastT);
   clearInterval(toastSpin);
   toastEl.replaceChildren();
@@ -59,22 +67,37 @@ function toast(msg, { busy = false, action = null, ms = 2600 } = {}) {
     toastSpin = setInterval(() => { spin.textContent = SPIN[++i % SPIN.length]; }, 80);
     toastEl.append(spin);
   }
-  toastEl.append(msg);
-  if (action) {
+  const text = document.createElement('span');
+  text.className = 'toast-msg';
+  text.textContent = msg;
+  toastEl.append(text);
+  const actions = [...(action ? [action] : []), ...extra];
+  toastActions = actions;
+  for (const a of actions) {
     const b = document.createElement('button');
     b.className = 'toast-action';
-    b.textContent = action.label;
-    b.addEventListener('click', () => { hideToast(); action.run(); });
+    b.textContent = a.label;
+    b.addEventListener('click', () => { toastActions = []; hideToast(); a.run(); });
     toastEl.append(b);
   }
-  toastEl.classList.remove('hidden');
-  if (!busy) toastT = setTimeout(() => { hideToast(); if (action && action.expire) action.expire(); }, ms);
+  clearTimeout(toastLeaveT);
+  toastEl.classList.remove('leaving', 'hidden');
+  if (!busy) toastT = setTimeout(() => { hideToast(); expireToast(); }, ms);
 }
 
+let toastLeaveT = 0;
 function hideToast() {
   clearTimeout(toastT);
   clearInterval(toastSpin);
-  toastEl.classList.add('hidden');
+  clearTimeout(toastLeaveT);
+  if (toastEl.classList.contains('hidden')) return;
+  // One short fade-out beat, then drop the content (its undo / delete actions must not keep a removed photo alive).
+  toastEl.classList.add('leaving');
+  toastLeaveT = setTimeout(() => {
+    toastEl.classList.remove('leaving');
+    toastEl.classList.add('hidden');
+    toastEl.replaceChildren();
+  }, 140);
 }
 
 // Small spinner inside a button while work runs; returns a function that updates its label.
@@ -112,7 +135,8 @@ function show(id) {
 }
 
 window.addEventListener('beforeunload', (e) => {
-  for (const ph of state.photos.values()) if (isEdited(ph)) { e.preventDefault(); e.returnValue = ''; return; }
+  // An edit that is already on disk (saved to its folder, params unchanged since) is not lost by leaving.
+  for (const ph of state.photos.values()) if (isEdited(ph) && !(ph.dir && !needsSave(ph))) { e.preventDefault(); e.returnValue = ''; return; }
 });
 
 // --- albums ---
@@ -192,6 +216,7 @@ function layoutGallery() {
   const targetH = width < 600 ? 140 : 240;
   const rows = justifyRows(photos.map(shownAspect), width, targetH, GALLERY_GAP);
   const frag = document.createDocumentFragment();
+  fadeIndex = 0;
   for (const r of rows) {
     const row = document.createElement('div');
     row.className = 'photo-row';
@@ -202,16 +227,35 @@ function layoutGallery() {
   photoGrid.replaceChildren(frag);
 }
 
+const seenCards = new Set(); // photos whose card already faded in: relayouts must not replay it
+let fadeIndex = 0;
 function photoCard(ph, h) {
   const card = document.createElement('div');
   card.className = 'photo-card' + (isEdited(ph) ? ' edited' : '') + (selected.has(ph.id) ? ' selected' : '');
   card.style.width = `${shownAspect(ph) * h}px`;
   card.title = ph.name;
   card.dataset.id = ph.id;
+  if (found && found.id === ph.id) {
+    // Relayouts rebuild cards; resume the highlight where it was instead of restarting it.
+    card.classList.add('just-edited');
+    card.style.animationDelay = `${-(performance.now() - found.at)}ms`;
+  }
   card.innerHTML = '<img loading="lazy" decoding="async" alt=""/><span class="nm"></span>'
     + '<div class="card-actions"><button class="dup" type="button" aria-label="Duplicate photo" title="Duplicate">⧉</button>'
-    + '<button class="del" type="button" aria-label="Delete photo" title="Delete">✕</button></div>';
-  card.querySelector('img').src = ph.thumbUrl || ph.url;
+    + '<button class="del" type="button" aria-label="Remove from album" title="Remove from album">✕</button></div>';
+  const img = card.querySelector('img');
+  if (seenCards.has(ph.id)) img.classList.add('loaded');
+  else {
+    img.style.transitionDelay = `${Math.min(fadeIndex++, 12) * 30}ms`;
+    const show = () => {
+      seenCards.add(ph.id);
+      img.classList.add('loaded');
+      setTimeout(() => { img.style.transitionDelay = ''; }, 600);
+    };
+    img.addEventListener('load', show, { once: true });
+    img.addEventListener('error', show, { once: true });
+  }
+  img.src = ph.thumbUrl || ph.url;
   card.querySelector('.nm').textContent = ph.name;
   card.querySelector('.dup').addEventListener('click', (e) => { e.stopPropagation(); doDuplicate(ph.id); });
   card.querySelector('.del').addEventListener('click', (e) => { e.stopPropagation(); doDelete([ph.id]); });
@@ -222,6 +266,25 @@ function photoCard(ph, h) {
     syncSelectUI();
   });
   return card;
+}
+
+// After Done / Cancel: bring the card you were editing into view and flash it briefly.
+function revealCard(id) {
+  found = { id, at: performance.now() };
+  clearTimeout(foundT);
+  foundT = setTimeout(() => {
+    found = null;
+    photoGrid.querySelector('.just-edited')?.classList.remove('just-edited');
+  }, FOUND_MS);
+}
+
+function scrollToFound() {
+  const card = found && photoGrid.querySelector(`.photo-card[data-id="${found.id}"]`);
+  if (!card) return;
+  const bar = document.querySelector('.topbar');
+  const top = (bar ? bar.offsetHeight : 0) + 8;
+  const r = card.getBoundingClientRect();
+  if (r.top < top || r.bottom > innerHeight - 8) card.scrollIntoView({ block: 'center', inline: 'nearest' });
 }
 
 // --- selection ---
@@ -248,7 +311,8 @@ function syncSelectUI() {
   btnSelExport.textContent = n ? `export ${n}` : 'export selected';
 }
 
-// Delete with undo instead of a blocking confirm.
+// Delete with undo instead of a blocking confirm. Photos that live in an opened folder also offer
+// to delete the file on disk; ignoring the toast leaves the file alone.
 function doDelete(ids) {
   const removed = ids.map((id) => deletePhoto(id)).filter(Boolean).reverse();
   if (!removed.length) return;
@@ -256,20 +320,44 @@ function doDelete(ids) {
   renderAlbums();
   renderAlbumDetail();
   const n = removed.length;
-  toast(`Deleted ${n === 1 ? removed[0].photo.name : n + ' photos'}`, {
-    ms: 6000,
-    action: {
-      label: 'undo',
-      run: () => { removed.reverse().forEach(restorePhoto); renderAlbums(); renderAlbumDetail(); toast(`Restored ${n === 1 ? removed[0].photo.name : n + ' photos'}`); },
-      expire: () => { for (const r of removed) if (!state.photos.has(r.photo.id) && !isUrlInUse(r.photo.url)) revokePhoto(r.photo); },
-    },
+  const label = n === 1 ? removed[0].photo.name : n + ' photos';
+  const onDisk = removed.filter((r) => r.photo.dir && r.photo.handle);
+  const release = () => { for (const r of removed) if (!state.photos.has(r.photo.id) && !isUrlInUse(r.photo.url)) revokePhoto(r.photo); };
+  const undo = {
+    label: 'undo',
+    run: () => { removed.reverse().forEach((r) => { useHeldCopy(r.photo); restorePhoto(r); }); renderAlbums(); renderAlbumDetail(); toast(`restored ${label}`); },
+    expire: release,
+  };
+  if (!onDisk.length) { toast(`deleted ${label}`, { ms: 6000, action: undo }); return; }
+  const files = onDisk.length === 1 ? onDisk[0].photo.handle.name : `${onDisk.length} files`;
+  toast(`removed ${label} from the album · ${onDisk.length === 1 ? 'the file is' : 'files are'} still on disk`, {
+    ms: 12000,
+    action: { label: onDisk.length === 1 ? 'also delete file' : `also delete ${files}`, run: () => deleteFromDisk(onDisk.map((r) => r.photo), release) },
+    extra: [{ ...undo, label: 'undo' }],
   });
+}
+
+// Removes the files themselves (File System Access). Originals backed up in .nomi-originals stay there.
+async function deleteFromDisk(photos, release) {
+  let gone = 0;
+  const failed = [];
+  try {
+    for (const dir of new Set(photos.map((p) => p.dir))) {
+      if (!(await ensurePermission(dir))) { toast(`no permission to delete in “${dir.name}” · files kept`); return; }
+    }
+    for (const ph of photos) {
+      try { await ph.dir.removeEntry(ph.handle.name); gone++; } catch (err) { failed.push(ph.handle.name); }
+    }
+  } finally { release(); }
+  toast(failed.length
+    ? `deleted ${gone} from disk · couldn't delete ${failed.join(', ')}`
+    : `deleted ${gone === 1 ? photos[0].handle.name : gone + ' files'} from disk`, { ms: failed.length ? 8000 : 4000 });
 }
 
 function doDuplicate(pid) {
   const copy = duplicatePhoto(pid);
   if (!copy) return;
-  toast(`Duplicated as ${copy.name}`);
+  toast(`duplicated as ${copy.name}`);
   renderAlbums();
   if (viewEditor.classList.contains('hidden')) renderAlbumDetail();
   else renderFilmstrip();
@@ -277,7 +365,7 @@ function doDuplicate(pid) {
 
 async function doImport(fileList, handleOf) {
   const albumId = state.activeAlbum;
-  if (!albumId) { toast('Create an album first'); return; }
+  if (!albumId) { toast('create an album first'); return; }
   const total = [...fileList].filter(looksLikeImage).length;
   importing = { albumId, done: 0, total };
   toast(`importing 0/${total}…`, { busy: true });
@@ -292,7 +380,7 @@ async function doImport(fileList, handleOf) {
       else renderFilmstrip();
     }, handleOf);
     importing = null;
-    const msg = `Added ${added.length} photo${added.length === 1 ? '' : 's'}`;
+    const msg = `added ${added.length} photo${added.length === 1 ? '' : 's'}`;
     if (skipped.length) {
       // Group reasons: "skipped 6 (4 HEIC not supported…, 2 not an image)"
       const byReason = new Map();
@@ -303,7 +391,7 @@ async function doImport(fileList, handleOf) {
     } else toast(msg);
   } catch (err) {
     importing = null;
-    toast(err && err.message ? err.message : 'Import failed');
+    toast(err && err.message ? err.message : 'import failed');
   }
   renderAlbums();
   if (state.activeAlbum === albumId) {
@@ -408,6 +496,7 @@ function syncUndoUI() {
 function restoreParams(p) {
   const ph = curPhoto();
   if (!ph) return;
+  setOriginal(false);
   // Keep the same params object: sliders, filters and crop hold references to it.
   for (const k of Object.keys(ph.params)) delete ph.params[k];
   Object.assign(ph.params, structuredClone(p));
@@ -478,12 +567,28 @@ function renderNow() {
   // Crop mode shows the full rotated frame under the overlay; otherwise the cropped result.
   const p = cropMode ? { ...ph.params, crop: FULL } : ph.params;
   if (engine.fitOutput(p)) containStage();
-  engine.render(p);
-  engine.renderTexts(ph.params.texts, p);
+  // Original keeps the framing (so a zoomed-in spot stays put) and drops tones, filter and text.
+  engine.render(showOriginal ? originalParams(p) : p);
+  if (!showOriginal) engine.renderTexts(ph.params.texts, p);
   sampleEdge();
   syncCropFrame();
   if (cropApi) cropApi.layout();
   if (textApi && tab === 'text') textApi.layout();
+}
+
+function originalParams(p) {
+  return { ...defaultParams(), crop: p.crop, rotation: p.rotation, straighten: p.straighten };
+}
+
+// Before / after: flips the stage between the untouched photo and the current edit.
+function setOriginal(on) {
+  on = !!on;
+  if (on === showOriginal) return;
+  showOriginal = on;
+  btnCompare.setAttribute('aria-pressed', String(on));
+  btnCompare.setAttribute('aria-label', on ? 'Show edited' : 'Show original');
+  viewEditor.classList.toggle('showing-original', on);
+  if (curPhoto()) renderNow();
 }
 
 async function openEditor(pid) {
@@ -491,16 +596,25 @@ async function openEditor(pid) {
   const ph = state.photos.get(pid);
   if (!ph) return;
   if (!engine) engine = createEngine(glCanvas);
-  if (!engine) { toast('WebGL2 is not available in this browser'); return; }
+  if (!engine) { toast('webgl2 is not available in this browser'); return; }
   if (!zoom) zoom = attachZoom({ wrap: stageWrap, canvas: glCanvas, enabled: () => tab === 'adjust' || tab === 'filters' });
   navTarget = pid;
   syncNavUI();
+  const leaving = curPhoto();
   // Decode first; until then the current photo stays on screen exactly as it is.
-  const bmp = await createImageBitmap(ph.file, { imageOrientation: 'from-image' });
+  let bmp;
+  try { bmp = await createImageBitmap(ph.file, { imageOrientation: 'from-image' }); } catch {
+    if (seq === openSeq) { navTarget = null; syncNavUI(); toast(`could not open ${ph.name}`); }
+    return;
+  }
   if (seq !== openSeq) { bmp.close(); return; } // a newer photo was opened meanwhile (fast arrowing)
   // Everything below runs in one task, so the swap is a single paint.
   cancelAnimationFrame(raf); raf = 0;
   clearTimeout(commitT);
+  setOriginal(false);
+  // Edits stay in memory when you move on: refresh the thumbnail of the photo you leave, with
+  // everything done up to this very moment (including changes made while the next one decoded).
+  if (leaving && leaving !== ph && state.photos.has(leaving.id)) refreshThumb(leaving);
   state.activePhoto = pid;
   navTarget = null;
   snapshot = structuredClone(ph.params);
@@ -517,6 +631,7 @@ async function openEditor(pid) {
   syncCropControls();
   resetHistory(ph);
   show('viewEditor');
+  glCanvas.classList.remove('photo-in'); void glCanvas.offsetWidth; glCanvas.classList.add('photo-in'); // fade the new photo in
   setTab('adjust');
   renderFilmstrip();
   syncNavUI();
@@ -541,6 +656,9 @@ function refreshThumb(ph) {
 }
 
 function closeEditor() {
+  openSeq++; // a photo still decoding after a fast arrow must not pop the editor back open
+  const leaving = curPhoto();
+  setOriginal(false);
   if (zoom) zoom.reset();
   refreshThumb(curPhoto());
   if (cropApi) { cropApi.destroy(); cropApi = null; }
@@ -549,8 +667,12 @@ function closeEditor() {
   clearTimeout(commitT);
   history = []; future = []; // edits are final once you leave the editor
   cropMode = false;
+  if (leaving) revealCard(leaving.id);
   renderAlbums();
   renderAlbumDetail();
+  // The gallery lays out synchronously above; look again after paint in case a resize moved it.
+  scrollToFound();
+  requestAnimationFrame(() => requestAnimationFrame(scrollToFound));
 }
 
 function syncCropControls() {
@@ -614,6 +736,7 @@ function renderFilterPreview(id, canvas) {
 
 function renderFilmstrip() {
   const al = state.albums.get(state.activeAlbum);
+  const keep = filmstrip.scrollLeft;
   filmstrip.innerHTML = '';
   if (!al) return;
   for (const pid of al.photoIds) {
@@ -625,16 +748,21 @@ function renderFilmstrip() {
     img.addEventListener('click', () => { if (pid !== state.activePhoto) switchPhoto(pid); });
     filmstrip.appendChild(img);
   }
+  filmstrip.scrollLeft = keep;
   const active = filmstrip.querySelector('img.active');
-  if (active) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  if (active) {
+    // Glide the current thumb to the middle (from where the strip was, so it never jumps back to 0).
+    const a = active.getBoundingClientRect(), f = filmstrip.getBoundingClientRect();
+    const left = filmstrip.scrollLeft + (a.left - f.left) - (f.width - a.width) / 2;
+    const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    filmstrip.scrollTo({ left, behavior: calm ? 'auto' : 'smooth' });
+  }
 }
 
 // Moving to another photo keeps the current edits (same as Done) and starts a fresh history.
 function switchPhoto(pid) {
   clearTimeout(commitT);
-  const cur = curPhoto();
-  if (cur) refreshThumb(cur);
-  openEditor(pid); // crop view / tab reset happen when the next photo is ready, in one paint
+  openEditor(pid); // the photo you leave keeps its edits and gets a fresh thumbnail at the swap; crop view / tab reset happen when the next photo is ready, in one paint
 }
 
 function neighbour(delta) {
@@ -670,9 +798,9 @@ async function doExport(ids) {
       setLabel(`${done}/${total}`);
       toast(`exporting ${done}/${total} · ${name}`, { busy: true });
     });
-    toast(`Saved ${photos.length} photo${photos.length === 1 ? '' : 's'} to ZIP`);
+    toast(`saved ${photos.length} photo${photos.length === 1 ? '' : 's'} to zip`);
     if (partial) setSelecting(false);
-  } catch (err) { toast(err && err.message ? err.message : 'Export failed'); }
+  } catch (err) { toast(err && err.message ? err.message : 'export failed'); }
   exporting = false;
   setLabel.done();
   syncSelectUI();
@@ -685,13 +813,14 @@ function exportScope(ids) {
 }
 
 // Photos that "save to folder" would write: edited folder photos, plus copies (new files).
-const toSave = (photos) => photos.filter((p) => p.dir && (isEdited(p) || !p.handle));
+// Only what differs from the file on disk (see needsSave in store.js).
+const toSave = (photos) => photos.filter(needsSave);
 
 function folderOption(photos) {
   if (!supportsFolders()) return { ok: false, hint: 'needs Chrome or Edge' };
   if (!photos.some((p) => p.dir)) return { ok: false, hint: 'open photos with “open folder” first' };
   const list = toSave(photos);
-  if (!list.length) return { ok: false, hint: 'nothing edited yet' };
+  if (!list.length) return { ok: false, hint: photos.some((p) => p.savedParams) ? 'nothing changed since last save' : 'nothing edited yet' };
   return { ok: true, hint: `${saveSummary(list)} · originals kept in ${BACKUP_DIR}` };
 }
 
@@ -751,10 +880,12 @@ async function doSaveToFolder(ids) {
   // Copies (no handle yet) first: they may read the same original file that is about to be replaced.
   const photos = toSave(exportScope(ids)).sort((a, b) => (a.handle ? 1 : 0) - (b.handle ? 1 : 0));
   if (!photos.length || saving) return;
-  for (const dir of new Set(photos.map((p) => p.dir))) {
-    if (!(await ensurePermission(dir))) { toast(`No permission to write to “${dir.name}”`); return; }
-  }
-  saving = true;
+  saving = true; // before any await, so a second click can't start a parallel save
+  try {
+    for (const dir of new Set(photos.map((p) => p.dir))) {
+      if (!(await ensurePermission(dir))) { saving = false; toast(`no permission to write to “${dir.name}”`); return; }
+    }
+  } catch (err) { saving = false; toast((err && err.message) || 'could not get permission'); return; }
   syncSelectUI();
   const setLabel = busyButton(btnDownloadAlbum, `0/${photos.length}`);
   const skipped = [];
@@ -763,20 +894,16 @@ async function doSaveToFolder(ids) {
     toast(`saving ${i + 1}/${photos.length} · ${ph.name}`, { busy: true });
     setLabel(`${i + 1}/${photos.length}`);
     try {
-      const oldFile = ph.file;
-      // Anything else still reading this file (e.g. an unsaved copy) gets an in-memory snapshot first.
-      const sharing = [...state.photos.values()].filter((p) => p !== ph && p.file === oldFile);
-      if (sharing.length && ph.handle) {
-        const snapshotFile = new File([await oldFile.arrayBuffer()], oldFile.name, { type: oldFile.type, lastModified: oldFile.lastModified });
-        const url = URL.createObjectURL(snapshotFile);
-        for (const p of sharing) { p.file = snapshotFile; p.url = url; }
-      }
-      const r = await saveInPlace(ph);
+      if (ph.handle && !ph.createdHere) await holdOriginal(ph);
+      // Render from a snapshot: edits made meanwhile (the editor stays usable) must not be marked as saved.
+      const view = { ...ph, params: structuredClone(ph.params) };
+      const r = await saveInPlace(view);
       if (r.status === 'skipped') { skipped.push({ name: ph.name, reason: r.reason }); continue; }
-      bakeSaved(ph, r);
+      markSaved(ph, r, view.params);
       if (r.status === 'created') created++; else saved++;
     } catch (err) {
-      skipped.push({ name: ph.name, reason: (err && err.message) || 'write failed' });
+      const gone = err && err.name === 'NotReadableError';
+      skipped.push({ name: ph.name, reason: gone ? 'file changed on disk — reopen the folder' : (err && err.message) || 'write failed' });
     }
   }
   saving = false;
@@ -793,29 +920,44 @@ async function doSaveToFolder(ids) {
   toast(msg, { ms: 8000 });
 }
 
-// The file on disk now contains the edit: point the photo at it and start from neutral settings.
-function bakeSaved(ph, { file, handle, status }) {
-  const o = outputSize(ph.width, ph.height, ph.params.crop, rotSteps(ph.params.rotation), Infinity);
-  const oldUrl = ph.url;
-  ph.file = file;
+// A File from getFile() can stop being readable once the file on disk is replaced, and this photo
+// is about to replace it. Keep the original bytes in memory (shared by every photo that reads the
+// same file, e.g. its copies) so reopening, saving again and zip export always start from the original.
+async function holdOriginal(ph) {
+  const oldFile = ph.file;
+  if (memoryFiles.has(oldFile)) return;
+  const copy = new File([await oldFile.arrayBuffer()], oldFile.name, { type: oldFile.type, lastModified: oldFile.lastModified });
+  memoryFiles.add(copy);
+  const oldUrl = ph.url, url = URL.createObjectURL(copy);
+  heldCopy.set(oldFile, { file: copy, url });
+  for (const p of state.photos.values()) if (p.file === oldFile) { p.file = copy; p.url = url; }
+  if (!isUrlInUse(oldUrl)) URL.revokeObjectURL(oldUrl);
+}
+
+// Non-destructive: the photo keeps its ORIGINAL file, size and full params, so it reopens with every
+// slider where you left it and the next save renders from the original again. We only remember where
+// the result lives (handle) and which params it was written with (savedParams).
+// A photo deleted before its source was held (and restored by undo) still points at the old File.
+function useHeldCopy(ph) {
+  const held = heldCopy.get(ph.file);
+  if (held) { ph.file = held.file; ph.url = held.url; }
+}
+
+function markSaved(ph, { handle, status }, written) {
   ph.handle = handle;
   ph.name = handle.name;
   if (status === 'created') ph.createdHere = true; // written by nomi: no original to back up later
-  ph.url = URL.createObjectURL(file);
-  ph.width = o.w; ph.height = o.h;
-  for (const k of Object.keys(ph.params)) delete ph.params[k];
-  Object.assign(ph.params, defaultParams());
-  if (!isUrlInUse(oldUrl)) URL.revokeObjectURL(oldUrl);
+  ph.savedParams = structuredClone(written || ph.params);
 }
 
 // Every folder becomes its own album, named after the folder.
 async function doOpenFolder() {
   let res;
   try { res = await openFolder(); } catch (err) {
-    if (err && err.name !== 'AbortError') toast(err.message || 'Could not open folder');
+    if (err && err.name !== 'AbortError') toast(err.message || 'could not open folder');
     return;
   }
-  if (!res.entries.length) { toast(`No images in “${res.name}”`); return; }
+  if (!res.entries.length) { toast(`no images in “${res.name}”`); return; }
   const id = uid('al');
   state.albums.set(id, { id, name: res.name.slice(0, 60), folder: res.name, photoIds: [], createdAt: Date.now() });
   renderAlbums();
@@ -833,7 +975,7 @@ btnNewAlbum.addEventListener('click', () => {
   albumName.focus();
   albumName.select();
 });
-btnDemo.addEventListener('click', () => toast('New album → Import photos → click a photo → Done → Download ZIP'));
+btnDemo.addEventListener('click', () => toast('new album → import photos → click a photo → done → export'));
 btnBackAlbums.addEventListener('click', () => { if (selecting) setSelecting(false); state.activeAlbum = null; renderAlbums(); show('viewAlbums'); });
 albumName.addEventListener('input', () => {
   const al = state.albums.get(state.activeAlbum);
@@ -867,7 +1009,7 @@ async function filesFromDrop(dt) {
 window.addEventListener('drop', async (e) => {
   e.preventDefault();
   if (!e.dataTransfer) return;
-  if (!state.activeAlbum) { toast('Open an album to import'); return; }
+  if (!state.activeAlbum) { toast('open an album to import'); return; }
   const al = state.albums.get(state.activeAlbum);
   if (al && al.folder) { toast(`“${al.folder}” mirrors its folder — add photos to the folder, or use a new album`); return; }
   const files = await filesFromDrop(e.dataTransfer);
@@ -893,6 +1035,7 @@ inStraighten.addEventListener('input', () => {
 });
 btnReset.addEventListener('click', () => {
   const ph = curPhoto(); if (!ph) return;
+  setOriginal(false);
   Object.assign(ph.params, defaultParams());
   if (sliders) sliders.update();
   if (filterStrip) { filterStrip.update(); filterStrip.refresh(); }
@@ -900,11 +1043,15 @@ btnReset.addEventListener('click', () => {
   if (textApi) textApi.refresh();
   schedule();
   if (cropMode) settleCropSoon(0);
-  toast('Reset');
+  toast('reset');
 });
 btnBackAlbum.addEventListener('click', () => {
   const ph = curPhoto();
-  if (ph && snapshot) Object.assign(ph.params, snapshot);
+  if (ph && snapshot) {
+    // Back to how the photo was when it was (re)opened; edits on other photos are untouched.
+    for (const k of Object.keys(ph.params)) delete ph.params[k];
+    Object.assign(ph.params, structuredClone(snapshot));
+  }
   closeEditor();
 });
 btnDone.addEventListener('click', closeEditor);
@@ -935,6 +1082,17 @@ document.addEventListener('keydown', (e) => {
 });
 inStraighten.addEventListener('pointerup', () => inStraighten.blur());
 btnRedo.addEventListener('click', redo);
+btnCompare.addEventListener('click', () => setOriginal(!showOriginal));
+// Any edit in the rail goes back to the edited view, so the change is visible.
+document.querySelector('.rail').addEventListener('pointerdown', () => setOriginal(false), true);
+document.querySelector('.rail').addEventListener('input', () => setOriginal(false), true);
+document.addEventListener('keydown', (e) => {
+  if (viewEditor.classList.contains('hidden') || e.key !== '\\' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const el = document.activeElement;
+  if (el && el.matches('input:not([type=range]), textarea, [contenteditable]')) return;
+  e.preventDefault();
+  setOriginal(!showOriginal);
+});
 document.addEventListener('keydown', (e) => {
   if (viewEditor.classList.contains('hidden') || !(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
   e.preventDefault();
@@ -990,7 +1148,12 @@ btnSelAll.addEventListener('click', () => {
 btnSelExport.addEventListener('click', () => openExportMenu([...selected], btnSelExport));
 btnSelDelete.addEventListener('click', () => doDelete([...selected]));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && selecting) setSelecting(false); });
-btnDuplicate.addEventListener('click', () => { if (state.activePhoto) doDuplicate(state.activePhoto); });
+btnDuplicate.addEventListener('click', () => {
+  const ph = curPhoto();
+  if (!ph) return;
+  refreshThumb(ph); // the copy starts with this photo's current look in the filmstrip
+  doDuplicate(ph.id);
+});
 new ResizeObserver(() => { if (!viewAlbum.classList.contains('hidden')) layoutGallery(); }).observe(photoGrid);
 
 renderAlbums();

@@ -1,4 +1,4 @@
-// Apple Photos-style crop overlay: drag body to move, drag corners to resize,
+// Apple Photos-style crop overlay: drag body to move, drag corners or sides to resize,
 // aspect presets. Vanilla, Pointer Events only.
 //
 // params.crop is stored in SOURCE space (unrotated image, normalized 0..1).
@@ -6,7 +6,7 @@
 // shown in #cropLayer) and converts on every read/write via cropmath.js.
 import {
   clamp01Rect, rotSteps, displayToSource, sourceToDisplay, displayAspect,
-  centeredAspectRect, moveRect, resizeFromCorner,
+  centeredAspectRect, moveRect, resizeFromCorner, resizeFromEdge,
 } from './cropmath.js';
 
 // ratio: pixel width/height of the crop.
@@ -68,8 +68,22 @@ export function attachCrop(a, b, c, d, e) {
     box.style.top = r.y * 100 + '%';
     box.style.width = r.w * 100 + '%';
     box.style.height = r.h * 100 + '%';
+    fitHandles();
+  }
+  // Hit areas are 44 screen px, but on a tiny box neighbouring corners would overlap and steal
+  // each other's grab: shrink them to the box's smallest screen side (never below 14).
+  function fitHandles() {
+    const inv = parseFloat(layer.style.getPropertyValue('--inv')) || 1; // layer zoom = 1 / inv
+    const m = Math.min(box.offsetWidth, box.offsetHeight) / inv;
+    box.style.setProperty('--hs', Math.max(14, Math.min(44, m)) + 'px');
   }
   layout();
+  // The editor zooms/unhides the layer without calling layout(): re-fit when its style/class changes.
+  let mo = null;
+  if (typeof MutationObserver !== 'undefined' && layer.nodeType === 1) {
+    mo = new MutationObserver(fitHandles);
+    mo.observe(layer, { attributes: true, attributeFilter: ['style', 'class'] });
+  }
 
   const cleanups = [];
   const on = (el, type, fn, o) => {
@@ -93,6 +107,7 @@ export function attachCrop(a, b, c, d, e) {
     if (gesture) gesture(false);
     const handle = e.target && e.target.closest ? e.target.closest('.h') : null;
     const corner = handle ? ['tl', 'tr', 'bl', 'br'].find((k) => handle.classList.contains(k)) : null;
+    const edge = handle && !corner ? ['t', 'r', 'b', 'l'].find((k) => handle.classList.contains(k)) : null;
     const target = e.currentTarget || box;
     const rect = wrap.getBoundingClientRect();
     const rw = rect.width || 1, rh = rect.height || 1;
@@ -105,7 +120,9 @@ export function attachCrop(a, b, c, d, e) {
     const move = (ev) => {
       if (ev.pointerId !== id) return;
       const dx = (ev.clientX - sx) / rw, dy = (ev.clientY - sy) / rh;
-      writeDisp(corner ? resizeFromCorner(start, corner, dx, dy, lock, dA) : moveRect(start, dx, dy));
+      writeDisp(corner ? resizeFromCorner(start, corner, dx, dy, lock, dA)
+        : edge ? resizeFromEdge(start, edge, dx, dy, lock, dA)
+        : moveRect(start, dx, dy));
       layout();
       emitThrottled();
     };
@@ -126,7 +143,7 @@ export function attachCrop(a, b, c, d, e) {
   }
 
   on(box, 'pointerdown', onDown);
-  for (const k of ['tl', 'tr', 'bl', 'br']) {
+  for (const k of ['tl', 'tr', 'bl', 'br', 't', 'r', 'b', 'l']) {
     const h = box.querySelector('.h.' + k) || box.querySelector('.' + k);
     if (h) on(h, 'pointerdown', onDown);
   }
@@ -154,6 +171,7 @@ export function attachCrop(a, b, c, d, e) {
     if (rafId) { caf(rafId); rafId = 0; }
     cleanups.forEach((fn) => fn());
     cleanups.length = 0;
+    if (mo) mo.disconnect();
   }
 
   return { layout, setAspect, reset, destroy };
